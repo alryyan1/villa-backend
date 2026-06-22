@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\ImportController;
+use App\Http\Controllers\Api\SettingController;
 
 // Public auth routes
 Route::prefix('v1')->group(function () {
@@ -22,8 +23,11 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+        Route::put('me', [AuthController::class, 'updateProfile']);
+        Route::put('me/password', [AuthController::class, 'changePassword']);
 
         // Resources
+        Route::get('villas/stats', [VillaController::class, 'stats']);
         Route::apiResource('villas', VillaController::class);
         Route::get('villas/{villa}/bookings', [VillaController::class, 'bookings']);
         Route::get('villas/{villa}/calendar', [VillaController::class, 'calendar']);
@@ -34,6 +38,8 @@ Route::prefix('v1')->group(function () {
 
         Route::apiResource('bookings', BookingController::class);
         Route::post('bookings/check-availability', [BookingController::class, 'checkAvailability']);
+        Route::post('bookings/{booking}/confirm-arrival', [BookingController::class, 'confirmArrival']);
+        Route::post('bookings/{booking}/confirm-departure', [BookingController::class, 'confirmDeparture']);
         Route::post('bookings/{booking}/payments', [PaymentController::class, 'store']);
         Route::get('bookings/{booking}/payments', [PaymentController::class, 'index']);
 
@@ -46,15 +52,22 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/villa-performance', [ReportController::class, 'villaPerformance']);
         Route::get('reports/user-performance', [ReportController::class, 'userPerformance']);
         Route::get('reports/bookings-summary', [ReportController::class, 'bookingsSummary']);
+        Route::get('reports/payment-methods', [ReportController::class, 'paymentMethods']);
 
         // Users (admin only)
         Route::apiResource('users', UserController::class);
 
         // Notifications
         Route::post('notifications/whatsapp', [NotificationController::class, 'sendWhatsApp']);
+        Route::get('notifications/whatsapp-phone', [NotificationController::class, 'whatsappPhoneInfo']);
+        Route::post('notifications/whatsapp-test', [NotificationController::class, 'whatsappTest']);
 
         // Activity logs
         Route::get('activity-logs', [ActivityLogController::class, 'index']);
+
+        // App settings (admin only)
+        Route::get('settings', [SettingController::class, 'index']);
+        Route::put('settings', [SettingController::class, 'update']);
 
         // Import
         Route::post('import/owners', [ImportController::class, 'importOwners']);

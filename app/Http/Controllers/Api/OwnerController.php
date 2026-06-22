@@ -17,6 +17,7 @@ class OwnerController extends Controller
             $query->where('name', 'like', "%{$request->search}%")
                   ->orWhere('phone', 'like', "%{$request->search}%");
         }
+        $query->orderBy('id', 'desc');
 
         $perPage = min((int) $request->input('per_page', 20), 999);
         return response()->json($query->orderBy('name')->paginate($perPage));

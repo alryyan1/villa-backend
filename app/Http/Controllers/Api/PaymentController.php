@@ -15,7 +15,7 @@ class PaymentController extends Controller
 
     public function index(Booking $booking)
     {
-        return response()->json($booking->payments()->orderByDesc('payment_date')->get());
+        return response()->json($booking->payments()->with('user')->orderByDesc('payment_date')->get());
     }
 
     public function store(Request $request, Booking $booking)
@@ -27,7 +27,10 @@ class PaymentController extends Controller
             'notes'        => 'nullable|string',
         ]);
 
+        $validated['user_id'] = $request->user()->id;
+
         $payment = $booking->payments()->create($validated);
+        $payment->load('user');
         $this->bookingService->updatePaymentStatus($booking);
 
         ActivityLogService::log('add_payment', 'Payment', $payment->id, [

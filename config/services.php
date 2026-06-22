@@ -36,11 +36,14 @@ return [
     ],
 
     'whatsapp_cloud' => [
-        'token'             => env('WHATSAPP_CLOUD_TOKEN', ''),
-        'phone_number_id'   => env('WHATSAPP_CLOUD_PHONE_NUMBER_ID', ''),
-        'waba_id'           => env('WHATSAPP_CLOUD_WABA_ID', ''),
-        'api_version'       => env('WHATSAPP_CLOUD_API_VERSION', 'v22.0'),
-        'management_number' => env('WHATSAPP_MANAGEMENT_NUMBER', ''),
+        'token'                   => env('WHATSAPP_CLOUD_TOKEN', ''),
+        'phone_number_id'         => env('WHATSAPP_CLOUD_PHONE_NUMBER_ID', ''),
+        'waba_id'                 => env('WHATSAPP_CLOUD_WABA_ID', ''),
+        'api_version'             => env('WHATSAPP_CLOUD_API_VERSION', 'v22.0'),
+        'management_number'       => env('WHATSAPP_MANAGEMENT_NUMBER', ''),
+        'booking_template_name'   => env('WHATSAPP_BOOKING_TEMPLATE_NAME', ''),
+        'booking_template_lang'   => env('WHATSAPP_BOOKING_TEMPLATE_LANG', 'en'),
+        'booking_alert_number'    => env('WHATSAPP_BOOKING_ALERT_NUMBER', '96878622990'),
     ],
 
 ];

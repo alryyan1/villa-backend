@@ -18,13 +18,16 @@ class BookingController extends Controller
 
     public function index(Request $request)
     {
-        $query = Booking::with(['villa', 'guest', 'user']);
+        $query = Booking::with(['villa', 'guest', 'user'])->withSum('payments', 'amount');
 
         if ($request->status) {
             $query->where('status', $request->status);
         }
         if ($request->villa_id) {
             $query->where('villa_id', $request->villa_id);
+        }
+        if ($request->guest_id) {
+            $query->where('guest_id', $request->guest_id);
         }
         if ($request->guest_name) {
             $query->whereHas('guest', fn($q) => $q->where('name', 'like', "%{$request->guest_name}%"));
@@ -78,6 +81,7 @@ class BookingController extends Controller
                 'amount'       => $validated['advance_amount'],
                 'payment_date' => now()->format('Y-m-d'),
                 'method'       => $validated['advance_method'],
+                'user_id'      => $request->user()->id,
             ]);
             $this->bookingService->updatePaymentStatus($booking);
             $booking->refresh();
@@ -97,7 +101,7 @@ class BookingController extends Controller
 
     public function show(Booking $booking)
     {
-        return response()->json($booking->load(['villa.owner', 'guest', 'user', 'payments']));
+        return response()->json($booking->load(['villa.owner', 'guest', 'user', 'payments.user']));
     }
 
     public function update(Request $request, Booking $booking)
@@ -147,6 +151,29 @@ class BookingController extends Controller
         }
 
         return response()->json($booking);
+    }
+
+    public function confirmArrival(Booking $booking)
+    {
+        if ($booking->checked_in_at) {
+            return response()->json(['message' => 'Already checked in.'], 422);
+        }
+        $booking->update(['checked_in_at' => now()]);
+        ActivityLogService::log('confirm_arrival', 'Booking', $booking->id);
+        return response()->json($booking->fresh());
+    }
+
+    public function confirmDeparture(Booking $booking)
+    {
+        if (!$booking->checked_in_at) {
+            return response()->json(['message' => 'Must confirm arrival first.'], 422);
+        }
+        if ($booking->checked_out_at) {
+            return response()->json(['message' => 'Already checked out.'], 422);
+        }
+        $booking->update(['checked_out_at' => now(), 'status' => 'completed']);
+        ActivityLogService::log('confirm_departure', 'Booking', $booking->id);
+        return response()->json($booking->fresh());
     }
 
     public function destroy(Booking $booking)

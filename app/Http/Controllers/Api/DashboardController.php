@@ -16,6 +16,7 @@ class DashboardController extends Controller
         $thisMonth = Carbon::now()->startOfMonth();
 
         $totalVillas       = Villa::count();
+        $managedVillas     = Villa::where('is_managed', true)->count();
         $availableVillas   = Villa::where('status', 'available')->count();
         $occupiedVillas    = Villa::where('status', 'occupied')->count();
 
@@ -70,6 +71,8 @@ class DashboardController extends Controller
 
         return response()->json([
             'total_villas'       => $totalVillas,
+            'managed_villas'     => $managedVillas,
+            'unmanaged_villas'   => $totalVillas - $managedVillas,
             'available_villas'   => $availableVillas,
             'occupied_villas'    => $occupiedVillas,
             'current_bookings'   => $currentBookings,

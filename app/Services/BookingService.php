@@ -41,7 +41,6 @@ class BookingService
     public function updatePaymentStatus(Booking $booking): void
     {
         $totalPaid = $booking->payments()->sum('amount');
-        $booking->paid_amount = $totalPaid;
 
         if ($totalPaid <= 0) {
             $booking->payment_status = 'unpaid';

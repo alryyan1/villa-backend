@@ -42,10 +42,6 @@ class WhatsAppCloudApiService
             return ['success' => false, 'error' => 'WhatsApp Cloud API service not configured.', 'data' => null];
         }
 
-        if ($phoneNumberId == "1010322575491077") {
-            $accessToken = 'EAAW6NIGs3xcBQp4qbUGEHol4WYmRYpbKbjWY8ZBxIalBV0psJoZA1evagLRnPKPwVIWaDZBjZCwFaFAUKcGnZBhoFQosZByzChm12UIeXQ94UVIojEXxGZCVFYVzx7Gbd6ZCYc4M18OIJwSg5idf9b2e5HVEXr7FFNuhduxOTBsTqQwmZA9ZBEYLubrAZAboVZB8rhGTR52WcZB4pSt39TLXr4X5xdZCQaSMRYtkey2oBc';
-        }
-
         $to       = ltrim($to, '+');
         $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$phoneNumberId}/messages";
 
@@ -178,6 +174,31 @@ class WhatsAppCloudApiService
             return $this->handleResponse($response, 'Image');
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendImage Exception: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
+        }
+    }
+
+    public function getPhoneNumberInfo(): array
+    {
+        if (!$this->accessToken || !$this->phoneNumberId) {
+            return ['success' => false, 'error' => 'WhatsApp Cloud API not configured.', 'data' => null];
+        }
+
+        $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$this->phoneNumberId}";
+
+        try {
+            $response = Http::withToken($this->accessToken)
+                ->get($endpoint, ['fields' => 'display_phone_number,verified_name,quality_rating,status,code_verification_status']);
+
+            $data = $response->json();
+
+            if ($response->successful()) {
+                return ['success' => true, 'data' => $data];
+            }
+
+            return ['success' => false, 'error' => $data['error']['message'] ?? 'Failed to fetch phone info.', 'data' => $data];
+        } catch (\Exception $e) {
+            Log::error('WhatsAppCloudApiService getPhoneNumberInfo: ' . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
         }
     }
