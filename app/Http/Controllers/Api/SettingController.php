@@ -8,7 +8,14 @@ use Illuminate\Http\Request;
 
 class SettingController extends Controller
 {
-    private const ALLOWED_KEYS = ['whatsapp_enabled', 'whatsapp_recipients', 'owner_notifications_enabled'];
+    private const ALLOWED_KEYS = [
+        'whatsapp_enabled',
+        'owner_notifications_enabled',
+        'owner_booking_template',
+        'owner_booking_template_lang',
+        'guest_booking_template',
+        'guest_booking_template_lang',
+    ];
 
     public function index()
     {
@@ -20,13 +27,6 @@ class SettingController extends Controller
             }
         }
 
-        // Decode recipients JSON so the frontend receives an array
-        if (isset($settings['whatsapp_recipients'])) {
-            $settings['whatsapp_recipients'] = json_decode($settings['whatsapp_recipients'], true) ?? [];
-        } else {
-            $settings['whatsapp_recipients'] = [];
-        }
-
         return response()->json($settings);
     }
 
@@ -35,21 +35,18 @@ class SettingController extends Controller
         $validated = $request->validate([
             'whatsapp_enabled'            => 'sometimes|boolean',
             'owner_notifications_enabled' => 'sometimes|boolean',
-            'whatsapp_recipients'         => 'sometimes|array',
-            'whatsapp_recipients.*'       => 'string|max:20',
+            'owner_booking_template'      => 'sometimes|nullable|string|max:100',
+            'owner_booking_template_lang' => 'sometimes|nullable|string|max:20',
+            'guest_booking_template'      => 'sometimes|nullable|string|max:100',
+            'guest_booking_template_lang' => 'sometimes|nullable|string|max:20',
         ]);
 
-        if (\array_key_exists('whatsapp_enabled', $validated)) {
-            Setting::set('whatsapp_enabled', $validated['whatsapp_enabled'] ? '1' : '0');
-        }
-
-        if (\array_key_exists('owner_notifications_enabled', $validated)) {
-            Setting::set('owner_notifications_enabled', $validated['owner_notifications_enabled'] ? '1' : '0');
-        }
-
-        if (\array_key_exists('whatsapp_recipients', $validated)) {
-            $numbers = array_values(array_filter(array_map('trim', $validated['whatsapp_recipients'])));
-            Setting::set('whatsapp_recipients', json_encode($numbers));
+        foreach ($validated as $key => $value) {
+            if (in_array($key, ['whatsapp_enabled', 'owner_notifications_enabled'], true)) {
+                Setting::set($key, $value ? '1' : '0');
+            } else {
+                Setting::set($key, $value ?? '');
+            }
         }
 
         return response()->json(['message' => 'Settings saved.']);

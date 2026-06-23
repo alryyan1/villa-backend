@@ -61,11 +61,15 @@ class BookingController extends Controller
             'advance_method'   => 'nullable|in:cash,card,bank_transfer|required_with:advance_amount',
         ]);
 
+        $villa = \App\Models\Villa::findOrFail($validated['villa_id']);
+
+        if (!$villa->contract_active) {
+            return response()->json(['message' => 'This villa does not have an active management contract and cannot be booked.'], 422);
+        }
+
         if (!$this->bookingService->checkAvailability($validated['villa_id'], $validated['check_in'], $validated['check_out'])) {
             return response()->json(['message' => 'The villa is already booked for this period.'], 422);
         }
-
-        $villa  = \App\Models\Villa::findOrFail($validated['villa_id']);
         $nights = $this->bookingService->calculateNights($validated['check_in'], $validated['check_out']);
 
         $validated['user_id']      = $request->user()->id;

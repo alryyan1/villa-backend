@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\MaintenanceController;
 
 // Public auth routes
 Route::prefix('v1')->group(function () {
@@ -68,6 +69,9 @@ Route::prefix('v1')->group(function () {
         // App settings (admin only)
         Route::get('settings', [SettingController::class, 'index']);
         Route::put('settings', [SettingController::class, 'update']);
+
+        // Maintenance
+        Route::get('maintenance/turnover', [MaintenanceController::class, 'turnover']);
 
         // Import
         Route::post('import/owners', [ImportController::class, 'importOwners']);

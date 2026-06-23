@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property string $status
  * @property numeric $price_per_night
  * @property int $owner_id
- * @property bool $is_managed
  * @property string|null $notes
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -46,13 +45,28 @@ class Villa extends Model
 
     protected $fillable = [
         'name', 'description', 'category', 'num_rooms', 'status',
-        'price_per_night', 'owner_id', 'is_managed', 'notes',
+        'price_per_night', 'owner_id', 'notes',
+        'contract_start_date', 'contract_end_date', 'contract_monthly_value',
     ];
 
     protected $casts = [
-        'price_per_night' => 'decimal:2',
-        'is_managed'      => 'boolean',
+        'price_per_night'        => 'decimal:2',
+        'contract_monthly_value' => 'decimal:2',
+        'contract_start_date'    => 'date',
+        'contract_end_date'      => 'date',
     ];
+
+    protected $appends = ['contract_active'];
+
+    public function getContractActiveAttribute(): bool
+    {
+        if (!$this->contract_start_date || !$this->contract_end_date) {
+            return false;
+        }
+        $today = now()->toDateString();
+        return $this->contract_start_date->format('Y-m-d') <= $today
+            && $this->contract_end_date->format('Y-m-d') >= $today;
+    }
 
     public function owner()
     {

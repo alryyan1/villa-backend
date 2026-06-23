@@ -15,7 +15,10 @@ class VillaController extends Controller
         $query = Villa::with('owner');
 
         if ($request->search) {
-            $query->where('name', 'like', "%{$request->search}%");
+            $query->where(function ($q) use ($request) {
+                $q->where('name', 'like', "%{$request->search}%")
+                  ->orWhereHas('owner', fn($o) => $o->where('name', 'like', "%{$request->search}%"));
+            });
         }
         if ($request->status) {
             $query->where('status', $request->status);
@@ -23,15 +26,19 @@ class VillaController extends Controller
         if ($request->owner_id) {
             $query->where('owner_id', $request->owner_id);
         }
-        if ($request->has('is_managed') && $request->input('is_managed') !== '') {
-            $query->where('is_managed', (bool) $request->input('is_managed'));
+        if ($request->boolean('contract_active')) {
+            $today = now()->toDateString();
+            $query->whereDate('contract_start_date', '<=', $today)
+                  ->whereDate('contract_end_date', '>=', $today);
         }
 
         $perPage = min((int) $request->input('per_page', 20), 999);
         $paginated = $query->orderBy('name')->paginate($perPage);
 
         $today = now()->toDateString();
-        $occupiedIds = Booking::whereIn('villa_id', $paginated->pluck('id'))
+        $villaIds = $paginated->pluck('id');
+
+        $occupiedIds = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
             ->whereDate('check_in', '<=', $today)
             ->whereDate('check_out', '>=', $today)
@@ -39,12 +46,21 @@ class VillaController extends Controller
             ->flip()
             ->all();
 
-        $paginated->getCollection()->transform(function ($villa) use ($occupiedIds) {
+        $checkingInTodayIds = Booking::whereIn('villa_id', $villaIds)
+            ->whereIn('status', ['confirmed', 'pending'])
+            ->whereNotNull('checked_in_at')
+            ->whereDate('check_out', '>=', $today)
+            ->pluck('villa_id')
+            ->flip()
+            ->all();
+
+        $paginated->getCollection()->transform(function ($villa) use ($occupiedIds, $checkingInTodayIds) {
             if ($villa->status !== 'maintenance' && isset($occupiedIds[$villa->id])) {
                 $villa->status = 'occupied';
             } elseif ($villa->status !== 'maintenance' && !isset($occupiedIds[$villa->id])) {
                 $villa->status = 'available';
             }
+            $villa->checking_in_today = isset($checkingInTodayIds[$villa->id]);
             return $villa;
         });
 
@@ -54,15 +70,17 @@ class VillaController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'category' => 'nullable|in:Seashell,Coral,Garden,Breeze,Pearl',
-            'num_rooms' => 'nullable|integer|min:1|max:20',
-            'status' => 'in:available,occupied,maintenance',
-            'price_per_night' => 'required|numeric|min:0',
-            'owner_id' => 'required|exists:owners,id',
-            'is_managed' => 'boolean',
-            'notes' => 'nullable|string',
+            'name'                   => 'required|string|max:255',
+            'description'            => 'nullable|string',
+            'category'               => 'nullable|in:Seashell,Coral,Garden,Breeze,Pearl',
+            'num_rooms'              => 'nullable|integer|min:1|max:20',
+            'status'                 => 'in:available,occupied,maintenance',
+            'price_per_night'        => 'required|numeric|min:0',
+            'owner_id'               => 'required|exists:owners,id',
+            'notes'                  => 'nullable|string',
+            'contract_start_date'    => 'nullable|date',
+            'contract_end_date'      => 'nullable|date|after_or_equal:contract_start_date',
+            'contract_monthly_value' => 'nullable|numeric|min:0',
         ]);
 
         $villa = Villa::create($validated);
@@ -79,15 +97,17 @@ class VillaController extends Controller
     public function update(Request $request, Villa $villa)
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-            'category' => 'nullable|in:Seashell,Coral,Garden,Breeze,Pearl',
-            'num_rooms' => 'nullable|integer|min:1|max:20',
-            'status' => 'in:available,occupied,maintenance',
-            'price_per_night' => 'sometimes|numeric|min:0',
-            'owner_id' => 'sometimes|exists:owners,id',
-            'is_managed' => 'boolean',
-            'notes' => 'nullable|string',
+            'name'                   => 'sometimes|string|max:255',
+            'description'            => 'nullable|string',
+            'category'               => 'nullable|in:Seashell,Coral,Garden,Breeze,Pearl',
+            'num_rooms'              => 'nullable|integer|min:1|max:20',
+            'status'                 => 'in:available,occupied,maintenance',
+            'price_per_night'        => 'sometimes|numeric|min:0',
+            'owner_id'               => 'sometimes|exists:owners,id',
+            'notes'                  => 'nullable|string',
+            'contract_start_date'    => 'nullable|date',
+            'contract_end_date'      => 'nullable|date|after_or_equal:contract_start_date',
+            'contract_monthly_value' => 'nullable|numeric|min:0',
         ]);
 
         $villa->update($validated);
@@ -98,11 +118,13 @@ class VillaController extends Controller
 
     public function stats(): \Illuminate\Http\JsonResponse
     {
-        $total     = Villa::count();
-        $managed   = Villa::where('is_managed', true)->count();
-        $unmanaged = $total - $managed;
+        $total    = Villa::count();
+        $today    = now()->toDateString();
+        $active   = Villa::whereDate('contract_start_date', '<=', $today)
+                         ->whereDate('contract_end_date', '>=', $today)
+                         ->count();
 
-        return response()->json(compact('total', 'managed', 'unmanaged'));
+        return response()->json(['total' => $total, 'active_contracts' => $active]);
     }
 
     public function destroy(Villa $villa)

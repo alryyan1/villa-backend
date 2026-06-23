@@ -46,14 +46,18 @@ class WhatsAppService
     {
         $booking->load(['villa.owner', 'guest', 'user']);
 
-     //   $this->sendToOwnerAndManagement($booking, $this->buildOwnerMessage($booking, 'Created'));
-
-        $guestPhone = $booking->guest->phone;
-        if ($guestPhone) {
-            $this->sendMessage($guestPhone, $this->buildGuestConfirmationMessage($booking));
+        // Owner template
+        if (Setting::get('owner_notifications_enabled', '1') === '1') {
+            $ownerPhone = $booking->villa->owner->whatsapp_number ?? $booking->villa->owner->phone;
+            if ($ownerPhone) {
+                $this->sendBookingTemplate($booking, $ownerPhone, 'owner');
+            }
         }
 
-        $this->sendBookingAlertTemplate($booking);
+        // Guest template
+        if ($booking->guest->phone) {
+            $this->sendBookingTemplate($booking, $booking->guest->phone, 'guest');
+        }
     }
 
     public function notifyBookingUpdated(Booking $booking): void
@@ -127,65 +131,51 @@ class WhatsAppService
             . "We wish you a pleasant stay! 🏡";
     }
 
-    private function sendBookingAlertTemplate(Booking $booking): void
+    private function sendBookingTemplate(Booking $booking, string $phone, string $recipient): void
     {
-        if (!$this->isEnabled()) {
-            return;
-        }
+        if (!$this->isEnabled()) return;
 
-        $templateName = config('services.whatsapp_cloud.booking_template_name', 'booking');
-        $templateLang = config('services.whatsapp_cloud.booking_template_lang', 'en');
-        $alertNumber  = config('services.whatsapp_cloud.booking_alert_number', '96878622990');
+        $templateName = Setting::get("{$recipient}_booking_template", '');
+        $templateLang = Setting::get("{$recipient}_booking_template_lang", 'ar');
 
         if (empty($templateName)) {
-            Log::info('WhatsApp booking alert template not configured — skipping.');
+            Log::info("WhatsApp: {$recipient} booking template not configured — skipping.");
             return;
         }
 
-        $components = [
-            [
-                'type'       => 'body',
-                'parameters' => [
-                    ['type' => 'text', 'text' => $booking->villa->name],
-                    ['type' => 'text', 'text' => $booking->guest->name],
-                    ['type' => 'text', 'text' => $booking->check_in->format('Y-m-d')],
-                    ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
-                    ['type' => 'text', 'text' => (string) ($booking->num_guests ?? 1)],
-                    ['type' => 'text', 'text' => number_format((float) $booking->total_amount, 3) . ' OMR'],
-                ],
-            ],
-        ];
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone);
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for {$recipient}: {$phone}");
+            return;
+        }
 
-        $result = $this->api->sendTemplateMessage($alertNumber, $templateName, $templateLang, $components);
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => $booking->guest->name],
+                ['type' => 'text', 'text' => $booking->villa->name],
+                ['type' => 'text', 'text' => $booking->check_in->format('Y-m-d')],
+                ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
+                ['type' => 'text', 'text' => (string) ($booking->num_guests ?? 1)],
+                ['type' => 'text', 'text' => number_format((float) $booking->total_amount, 3) . ' OMR'],
+                ['type' => 'text', 'text' => (string) $booking->nights],
+            ],
+        ]];
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
 
         if (!$result['success']) {
-            Log::error('WhatsApp booking alert template failed: ' . ($result['error'] ?? 'unknown'));
+            Log::error("WhatsApp {$recipient} template failed: " . ($result['error'] ?? 'unknown'));
         }
     }
 
     private function sendToOwnerAndManagement(Booking $booking, string $message): void
     {
-        $ownerNotificationsEnabled = Setting::get('owner_notifications_enabled', '1') === '1';
+        if (Setting::get('owner_notifications_enabled', '1') !== '1') return;
+
         $ownerPhone = $booking->villa->owner->whatsapp_number ?? $booking->villa->owner->phone;
-        if ($ownerPhone && $ownerNotificationsEnabled) {
-            Log::info("WhatsApp: sending to owner {$booking->villa->owner->name} ({$ownerPhone})");
-            // $this->sendMessage($ownerPhone, $message);
-        }
-
-        $recipients = json_decode(Setting::get('whatsapp_recipients', '[]'), true) ?? [];
-
-        // Fall back to config if no DB recipients are set
-        if (empty($recipients)) {
-            $mgmt = config('services.whatsapp_cloud.management_number', '');
-            if ($mgmt) {
-                $recipients[] = $mgmt;
-            }
-        }
-
-        foreach ($recipients as $phone) {
-            if ($phone && $phone !== $ownerPhone) {
-                $this->sendMessage($phone, $message);
-            }
+        if ($ownerPhone) {
+            $this->sendMessage($ownerPhone, $message);
         }
     }
 
