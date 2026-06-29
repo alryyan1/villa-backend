@@ -14,13 +14,17 @@ class OwnerController extends Controller
         $query = Owner::withCount('villas');
 
         if ($request->search) {
-            $query->where('name', 'like', "%{$request->search}%")
+            $query->where(function ($q) use ($request) {
+                $q->where('name', 'like', "%{$request->search}%")
                   ->orWhere('phone', 'like', "%{$request->search}%");
+            });
         }
-        $query->orderBy('id', 'desc');
 
-        $perPage = min((int) $request->input('per_page', 20), 999);
-        return response()->json($query->orderBy('name')->paginate($perPage));
+        if ($request->villa_id) {
+            $query->whereHas('villas', fn ($q) => $q->where('villas.id', $request->villa_id));
+        }
+
+        return response()->json($query->orderBy('id', 'desc')->get());
     }
 
     public function store(Request $request)

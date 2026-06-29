@@ -19,8 +19,7 @@ class GuestController extends Controller
                   ->orWhere('id_number', 'like', "%{$request->search}%");
         }
 
-        $perPage = min((int) $request->input('per_page', 20), 999);
-        return response()->json($query->orderBy('name')->paginate($perPage));
+        return response()->json($query->orderBy('id','desc')->get());
     }
 
     public function store(Request $request)

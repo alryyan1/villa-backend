@@ -8,18 +8,30 @@ use Carbon\Carbon;
 
 class BookingService
 {
+    /**
+     * Check whether a villa is available for the given date range.
+     *
+     * Returns true if no active (non-cancelled) booking overlaps the requested
+     * period. The overlap test uses the standard half-open interval logic:
+     *   existing.check_in  < requested.check_out
+     *   existing.check_out > requested.check_in
+     *-
+     * Same-day turnovers are allowed: a guest checking out on June 27 does NOT
+     * block a new booking that starts on June 27, because the strict inequalities
+     * (< and >) exclude shared boundary dates from being treated as a conflict.
+     *
+     * @param  int         $villaId           The villa to check.
+     * @param  string      $checkIn           Requested check-in date  (Y-m-d).
+     * @param  string      $checkOut          Requested check-out date (Y-m-d).
+     * @param  int|null    $excludeBookingId  Booking to ignore (used when editing an existing booking).
+     * @return bool  True = available, false = conflict found.
+     */
     public function checkAvailability(int $villaId, string $checkIn, string $checkOut, ?int $excludeBookingId = null): bool
     {
         $query = Booking::where('villa_id', $villaId)
             ->whereNotIn('status', ['cancelled'])
-            ->where(function ($q) use ($checkIn, $checkOut) {
-                $q->whereBetween('check_in', [$checkIn, $checkOut])
-                  ->orWhereBetween('check_out', [$checkIn, $checkOut])
-                  ->orWhere(function ($q2) use ($checkIn, $checkOut) {
-                      $q2->where('check_in', '<=', $checkIn)
-                         ->where('check_out', '>=', $checkOut);
-                  });
-            });
+            ->where('check_in', '<', $checkOut)
+            ->where('check_out', '>', $checkIn);
 
         if ($excludeBookingId) {
             $query->where('id', '!=', $excludeBookingId);
@@ -28,6 +40,16 @@ class BookingService
         return $query->count() === 0;
     }
 
+    /**
+     * Calculate the number of nights between check-in and check-out.
+     *
+     * Uses Carbon's diffInDays which counts only whole days, so
+     * June 27 → June 30 = 3 nights (not 4).
+     *
+     * @param  string  $checkIn   Check-in date  (Y-m-d).
+     * @param  string  $checkOut  Check-out date (Y-m-d).
+     * @return int  Number of nights.
+     */
     public function calculateNights(string $checkIn, string $checkOut): int
     {
         return Carbon::parse($checkIn)->diffInDays(Carbon::parse($checkOut));

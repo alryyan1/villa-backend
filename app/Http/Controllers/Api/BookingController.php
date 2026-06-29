@@ -57,6 +57,7 @@ class BookingController extends Controller
             'status'           => 'in:pending,confirmed,cancelled,completed',
             'notes'            => 'nullable|string',
             'payment_notes'    => 'nullable|string',
+            'price_per_night'  => 'nullable|numeric|min:0.001',
             'advance_amount'   => 'nullable|numeric|min:0.01',
             'advance_method'   => 'nullable|in:cash,card,bank_transfer|required_with:advance_amount',
         ]);
@@ -70,14 +71,15 @@ class BookingController extends Controller
         if (!$this->bookingService->checkAvailability($validated['villa_id'], $validated['check_in'], $validated['check_out'])) {
             return response()->json(['message' => 'The villa is already booked for this period.'], 422);
         }
-        $nights = $this->bookingService->calculateNights($validated['check_in'], $validated['check_out']);
+        $nights       = $this->bookingService->calculateNights($validated['check_in'], $validated['check_out']);
+        $effectiveRate = $validated['price_per_night'] ?? $villa->price_per_night;
 
         $validated['user_id']      = $request->user()->id;
         $validated['nights']       = $nights;
-        $validated['total_amount'] = $this->bookingService->calculateTotal($villa, $nights);
+        $validated['total_amount'] = round($effectiveRate * $nights, 3);
         $validated['status']       = $validated['status'] ?? 'confirmed';
 
-        $bookingData = collect($validated)->except(['advance_amount', 'advance_method'])->all();
+        $bookingData = collect($validated)->except(['advance_amount', 'advance_method', 'price_per_night'])->all();
         $booking = Booking::create($bookingData);
 
         if (!empty($validated['advance_amount'])) {
@@ -98,9 +100,9 @@ class BookingController extends Controller
             'guest' => $booking->guest->name,
         ]);
 
-        $this->whatsAppService->notifyBookingCreated($booking);
+        $whatsapp = $this->whatsAppService->notifyBookingCreated($booking);
 
-        return response()->json($booking, 201);
+        return response()->json(['booking' => $booking, 'whatsapp' => $whatsapp], 201);
     }
 
     public function show(Booking $booking)

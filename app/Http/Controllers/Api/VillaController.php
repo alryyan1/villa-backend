@@ -20,6 +20,9 @@ class VillaController extends Controller
                   ->orWhereHas('owner', fn($o) => $o->where('name', 'like', "%{$request->search}%"));
             });
         }
+        if ($request->category) {
+            $query->where('category', $request->category);
+        }
         if ($request->status) {
             $query->where('status', $request->status);
         }
@@ -35,32 +38,62 @@ class VillaController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 999);
         $paginated = $query->orderBy('name')->paginate($perPage);
 
-        $today = now()->toDateString();
+        $asOf     = $request->input('as_of', now()->toDateString());
+        $isToday  = $asOf === now()->toDateString();
         $villaIds = $paginated->pluck('id');
 
         $occupiedIds = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
-            ->whereDate('check_in', '<=', $today)
-            ->whereDate('check_out', '>=', $today)
+            ->whereDate('check_in', '<=', $asOf)
+            ->whereDate('check_out', '>=', $asOf)
             ->pluck('villa_id')
             ->flip()
             ->all();
 
-        $checkingInTodayIds = Booking::whereIn('villa_id', $villaIds)
+        // Guests physically inside (arrived today or earlier, not yet departed)
+        $checkingInTodayIds = $isToday
+            ? Booking::whereIn('villa_id', $villaIds)
+                ->whereIn('status', ['confirmed', 'pending'])
+                ->whereNotNull('checked_in_at')
+                ->whereDate('check_out', '>=', $asOf)
+                ->pluck('villa_id')
+                ->flip()
+                ->all()
+            : [];
+
+        // Check-in date is today but guest has NOT arrived yet
+        $awaitingArrivalIds = $isToday
+            ? Booking::whereIn('villa_id', $villaIds)
+                ->whereIn('status', ['confirmed', 'pending'])
+                ->whereDate('check_in', $asOf)
+                ->whereNull('checked_in_at')
+                ->pluck('villa_id')
+                ->flip()
+                ->all()
+            : [];
+
+        $activeBookings = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
-            ->whereNotNull('checked_in_at')
-            ->whereDate('check_out', '>=', $today)
-            ->pluck('villa_id')
-            ->flip()
-            ->all();
+            ->whereDate('check_in', '<=', $asOf)
+            ->whereDate('check_out', '>=', $asOf)
+            ->with('guest:id,name')
+            ->get(['id', 'villa_id', 'checked_in_at', 'checked_out_at', 'payment_status'])
+            ->keyBy('villa_id');
 
-        $paginated->getCollection()->transform(function ($villa) use ($occupiedIds, $checkingInTodayIds) {
+        $paginated->getCollection()->transform(function ($villa) use ($occupiedIds, $checkingInTodayIds, $awaitingArrivalIds, $activeBookings) {
             if ($villa->status !== 'maintenance' && isset($occupiedIds[$villa->id])) {
                 $villa->status = 'occupied';
             } elseif ($villa->status !== 'maintenance' && !isset($occupiedIds[$villa->id])) {
                 $villa->status = 'available';
             }
-            $villa->checking_in_today = isset($checkingInTodayIds[$villa->id]);
+            $villa->checking_in_today   = isset($checkingInTodayIds[$villa->id]);
+            $villa->awaiting_arrival    = isset($awaitingArrivalIds[$villa->id]);
+            $booking = $activeBookings->get($villa->id);
+            $villa->active_booking_id          = $booking?->id;
+            $villa->active_booking_guest        = $booking?->guest?->name;
+            $villa->active_booking_checked_in   = (bool) $booking?->checked_in_at;
+            $villa->active_booking_checked_out  = (bool) $booking?->checked_out_at;
+            $villa->active_booking_payment      = $booking?->payment_status;
             return $villa;
         });
 

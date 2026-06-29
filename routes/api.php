@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\MaintenanceController;
+use App\Http\Controllers\Api\CleaningLogController;
 
 // Public auth routes
 Route::prefix('v1')->group(function () {
@@ -59,6 +60,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('users', UserController::class);
 
         // Notifications
+        Route::get('notifications/summary', [NotificationController::class, 'summary']);
         Route::post('notifications/whatsapp', [NotificationController::class, 'sendWhatsApp']);
         Route::get('notifications/whatsapp-phone', [NotificationController::class, 'whatsappPhoneInfo']);
         Route::post('notifications/whatsapp-test', [NotificationController::class, 'whatsappTest']);
@@ -72,6 +74,11 @@ Route::prefix('v1')->group(function () {
 
         // Maintenance
         Route::get('maintenance/turnover', [MaintenanceController::class, 'turnover']);
+
+        // Cleaning logs
+        Route::get('maintenance/cleaning-logs/recent', [CleaningLogController::class, 'recent']);
+        Route::post('maintenance/cleaning-logs', [CleaningLogController::class, 'store']);
+        Route::delete('maintenance/cleaning-logs/{cleaningLog}', [CleaningLogController::class, 'destroy']);
 
         // Import
         Route::post('import/owners', [ImportController::class, 'importOwners']);
