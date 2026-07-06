@@ -28,6 +28,15 @@ class BookingService
      */
     public function checkAvailability(int $villaId, string $checkIn, string $checkOut, ?int $excludeBookingId = null): bool
     {
+        return $this->findConflicts($villaId, $checkIn, $checkOut, $excludeBookingId)->count() === 0;
+    }
+
+    /**
+     * Query for the non-cancelled bookings that overlap the given date range,
+     * using the same half-open interval logic as checkAvailability().
+     */
+    public function findConflicts(int $villaId, string $checkIn, string $checkOut, ?int $excludeBookingId = null)
+    {
         $query = Booking::where('villa_id', $villaId)
             ->whereNotIn('status', ['cancelled'])
             ->where('check_in', '<', $checkOut)
@@ -37,7 +46,7 @@ class BookingService
             $query->where('id', '!=', $excludeBookingId);
         }
 
-        return $query->count() === 0;
+        return $query;
     }
 
     /**

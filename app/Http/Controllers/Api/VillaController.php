@@ -80,10 +80,21 @@ class VillaController extends Controller
             ->whereDate('check_in', '<=', $asOfEnd)
             ->whereDate('check_out', '>=', $asOfStart)
             ->with('guest:id,name')
-            ->get(['id', 'villa_id', 'checked_in_at', 'checked_out_at', 'payment_status'])
+            ->get(['id', 'villa_id', 'check_in', 'check_out', 'checked_in_at', 'checked_out_at', 'payment_status'])
             ->keyBy('villa_id');
 
-        $paginated->getCollection()->transform(function ($villa) use ($occupiedIds, $checkingInTodayIds, $awaitingArrivalIds, $activeBookings) {
+        // Bookings count per villa for the current calendar month (by check-in date)
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd   = now()->endOfMonth()->toDateString();
+        $monthlyBookingCounts = Booking::whereIn('villa_id', $villaIds)
+            ->whereNotIn('status', ['cancelled'])
+            ->whereDate('check_in', '>=', $monthStart)
+            ->whereDate('check_in', '<=', $monthEnd)
+            ->selectRaw('villa_id, count(*) as cnt')
+            ->groupBy('villa_id')
+            ->pluck('cnt', 'villa_id');
+
+        $paginated->getCollection()->transform(function ($villa) use ($occupiedIds, $checkingInTodayIds, $awaitingArrivalIds, $activeBookings, $monthlyBookingCounts) {
             if ($villa->status !== 'maintenance' && isset($occupiedIds[$villa->id])) {
                 $villa->status = 'occupied';
             } elseif ($villa->status !== 'maintenance' && !isset($occupiedIds[$villa->id])) {
@@ -97,6 +108,9 @@ class VillaController extends Controller
             $villa->active_booking_checked_in   = (bool) $booking?->checked_in_at;
             $villa->active_booking_checked_out  = (bool) $booking?->checked_out_at;
             $villa->active_booking_payment      = $booking?->payment_status;
+            $villa->active_booking_check_in     = $booking?->check_in?->toDateString();
+            $villa->active_booking_check_out    = $booking?->check_out?->toDateString();
+            $villa->monthly_bookings_count       = (int) ($monthlyBookingCounts->get($villa->id) ?? 0);
             return $villa;
         });
 

@@ -45,6 +45,7 @@ Route::prefix('v1')->group(function () {
 
         Route::apiResource('bookings', BookingController::class);
         Route::post('bookings/check-availability', [BookingController::class, 'checkAvailability']);
+        Route::post('bookings/{booking}/confirm', [BookingController::class, 'confirmBooking']);
         Route::post('bookings/{booking}/confirm-arrival', [BookingController::class, 'confirmArrival']);
         Route::post('bookings/{booking}/confirm-departure', [BookingController::class, 'confirmDeparture']);
         Route::post('bookings/{booking}/send-checkout-reminder', [BookingController::class, 'sendCheckoutReminder']);

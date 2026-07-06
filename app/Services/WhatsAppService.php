@@ -20,7 +20,7 @@ class WhatsAppService
         return Setting::get('whatsapp_enabled', '1') === '1';
     }
 
-    public function sendMessage(string $phone, string $message): bool
+    public function sendMessage(string $phone, string $message, string $countryCode = '968'): bool
     {
         if (!$this->isEnabled()) {
             Log::info("WhatsApp (disabled): to={$phone}, msg={$message}");
@@ -32,7 +32,7 @@ class WhatsAppService
             return false;
         }
 
-        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone);
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone, $countryCode);
         if (!$normalized) {
             Log::warning("WhatsApp: invalid phone number: {$phone}");
             return false;
@@ -46,7 +46,8 @@ class WhatsAppService
     {
         $booking->load(['villa.owner', 'guest', 'user']);
 
-        $results = ['owner' => null, 'tenant' => null, 'user' => null];
+        $results  = ['owner' => null, 'tenant' => null, 'user' => null];
+        $noPhone = ['sent' => false, 'error' => 'No phone number'];
 
         // Owner template
         if (Setting::get('owner_notifications_enabled', '1') === '1') {
@@ -54,19 +55,35 @@ class WhatsAppService
             if ($ownerPhone) {
                 Log::info("WhatsApp: sending booking notification to owner: {$ownerPhone}");
                 $results['owner'] = $this->sendOwnerBookingTemplate($booking, $ownerPhone);
+            } else {
+                $results['owner'] = $noPhone;
             }
+        } else {
+            $results['owner'] = ['sent' => false, 'error' => 'Owner notifications disabled'];
         }
 
+        $tenantTemplateSender = $booking->status === 'pending'
+            ? fn (Booking $b, string $phone, string $cc) => $this->sendTenantPendingBookingTemplate($b, $phone, $cc)
+            : fn (Booking $b, string $phone, string $cc) => $this->sendTenantBookingTemplate($b, $phone, $cc);
+
         // Tenant template
-        if (Setting::get('tenant_notifications_enabled', '1') !== '0' && $booking->guest->phone) {
-            Log::info("WhatsApp: sending booking notification to tenant: {$booking->guest->phone}");
-            $results['tenant'] = $this->sendTenantBookingTemplate($booking, $booking->guest->phone);
+        if (Setting::get('tenant_notifications_enabled', '1') !== '0') {
+            if ($booking->guest->phone) {
+                Log::info("WhatsApp: sending booking notification to tenant: {$booking->guest->phone}");
+                $results['tenant'] = $tenantTemplateSender($booking, $booking->guest->phone, $booking->guest->country_code ?: '968');
+            } else {
+                $results['tenant'] = $noPhone;
+            }
+        } else {
+            $results['tenant'] = ['sent' => false, 'error' => 'Tenant notifications disabled'];
         }
 
         // Same guest template, sent to the staff member who created the booking
         if ($booking->user->phone) {
             Log::info("WhatsApp: sending booking notification to logged-in user: {$booking->user->phone}");
-            $results['user'] = $this->sendTenantBookingTemplate($booking, $booking->user->phone);
+            $results['user'] = $tenantTemplateSender($booking, $booking->user->phone, '968');
+        } else {
+            $results['user'] = $noPhone;
         }
 
         return $results;
@@ -89,7 +106,8 @@ class WhatsAppService
                 "Dear {$booking->guest->name},\n\n"
                 . "We would like to inform you that your booking for villa *{$booking->villa->name}* "
                 . "on {$booking->check_in->format('Y-m-d')} has been *cancelled*.\n\n"
-                . "Please contact us if you have any questions. Thank you 🏡"
+                . "Please contact us if you have any questions. Thank you 🏡",
+                $booking->guest->country_code ?: '968'
             );
         }
     }
@@ -197,7 +215,7 @@ class WhatsAppService
         return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
     }
 
-    private function sendTenantBookingTemplate(Booking $booking, string $phone): array
+    private function sendTenantBookingTemplate(Booking $booking, string $phone, string $countryCode = '968'): array
     {
         if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
 
@@ -209,7 +227,7 @@ class WhatsAppService
             return ['sent' => false, 'error' => 'Template not configured'];
         }
 
-        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone);
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone, $countryCode);
         if (!$normalized) {
             Log::warning("WhatsApp: invalid phone for tenant: {$phone}");
             return ['sent' => false, 'error' => 'Invalid phone number'];
@@ -250,6 +268,59 @@ class WhatsAppService
         return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
     }
 
+    private function sendTenantPendingBookingTemplate(Booking $booking, string $phone, string $countryCode = '968'): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $templateName = Setting::get('guest_pending_booking_template', '');
+        $templateLang = Setting::get('guest_pending_booking_template_lang', 'ar');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: pending tenant booking template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone, $countryCode);
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for tenant: {$phone}");
+            return ['sent' => false, 'error' => 'Invalid phone number'];
+        }
+
+        $receptionPhone1 = Setting::get('reception_phone_1', '76767769');
+        $receptionPhone2 = Setting::get('reception_phone_2', '76767768');
+
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => (string) $booking->id],
+                ['type' => 'text', 'text' => $booking->villa->name],
+                ['type' => 'text', 'text' => $booking->check_in->format('Y-m-d')],
+                ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
+                ['type' => 'text', 'text' => number_format((float) $booking->total_amount, 3)],
+                ['type' => 'text', 'text' => $receptionPhone1],
+                ['type' => 'text', 'text' => $receptionPhone2],
+            ],
+        ]];
+
+        // Only attach a button component if the currently-configured template actually
+        // has a "Download Pdf" quick-reply button — the live default template does not,
+        // and Meta rejects button params that don't match the approved template.
+        if (Setting::get('guest_pending_booking_template_has_button', '0') === '1') {
+            $components[] = [
+                'type' => 'button', 'sub_type' => 'quick_reply', 'index' => '0',
+                'parameters' => [['type' => 'payload', 'payload' => "download_pdf:{$booking->id}"]],
+            ];
+        }
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+
+        if (!$result['success']) {
+            Log::error('WhatsApp pending tenant template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
+    }
+
     public function sendCheckoutReminder(Booking $booking): array
     {
         if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
@@ -263,7 +334,7 @@ class WhatsAppService
         }
 
         $phone = $booking->guest->phone ?? null;
-        $normalized = $phone ? WhatsAppCloudApiService::formatPhoneNumber($phone) : null;
+        $normalized = $phone ? WhatsAppCloudApiService::formatPhoneNumber($phone, $booking->guest->country_code ?: '968') : null;
         if (!$normalized) {
             Log::warning("WhatsApp: invalid or missing phone for guest on booking {$booking->id}");
             return ['sent' => false, 'error' => 'Invalid or missing phone number'];

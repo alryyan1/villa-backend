@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property int $id
  * @property string $name
  * @property string|null $phone
+ * @property string $country_code
  * @property string|null $id_number
  * @property string|null $nationality
  * @property string|null $notes
@@ -34,7 +35,7 @@ class Guest extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'phone', 'id_number', 'nationality', 'notes',
+        'name', 'phone', 'country_code', 'id_number', 'nationality', 'notes',
     ];
 
     public function bookings()

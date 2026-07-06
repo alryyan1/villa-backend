@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Setting;
 use App\Services\ActivityLogService;
 use App\Services\BookingService;
 use App\Services\FirebaseService;
@@ -69,6 +70,10 @@ class BookingController extends Controller
 
         if (!$villa->contract_active) {
             return response()->json(['message' => 'This villa does not have an active management contract and cannot be booked.'], 422);
+        }
+
+        if ($villa->status === 'maintenance') {
+            return response()->json(['message' => 'This villa is under maintenance and cannot be booked.'], 422);
         }
 
         if (!$this->bookingService->checkAvailability($validated['villa_id'], $validated['check_in'], $validated['check_out'])) {
@@ -173,6 +178,35 @@ class BookingController extends Controller
         return response()->json($booking);
     }
 
+    public function confirmBooking(Booking $booking)
+    {
+        if ($booking->status !== 'pending') {
+            return response()->json(['message' => 'Only pending bookings can be confirmed.'], 422);
+        }
+
+        $booking->update(['status' => 'confirmed']);
+        $booking->load(['villa.owner', 'guest', 'user']);
+
+        ActivityLogService::log('confirm_booking', 'Booking', $booking->id, [
+            'villa' => $booking->villa->name,
+            'guest' => $booking->guest->name,
+        ]);
+
+        $notify   = Setting::get('booking_confirmation_notify_enabled', '1') === '1';
+        $whatsapp = ['owner' => null, 'tenant' => null, 'user' => null];
+
+        if ($notify) {
+            try {
+                $this->firebaseService->generateAndStoreBookingConfirmation($booking);
+            } catch (\Throwable $e) {
+                Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
+            }
+            $whatsapp = $this->whatsAppService->notifyBookingCreated($booking);
+        }
+
+        return response()->json(['booking' => $booking, 'whatsapp' => $whatsapp, 'notified' => $notify]);
+    }
+
     public function confirmArrival(Booking $booking)
     {
         if ($booking->checked_in_at) {
@@ -229,6 +263,22 @@ class BookingController extends Controller
             $request->booking_id
         );
 
-        return response()->json(['available' => $available]);
+        $conflicts = [];
+        if (!$available) {
+            $conflicts = $this->bookingService
+                ->findConflicts($request->villa_id, $request->check_in, $request->check_out, $request->booking_id)
+                ->with('guest:id,name')
+                ->orderBy('check_in')
+                ->get(['id', 'guest_id', 'check_in', 'check_out', 'status'])
+                ->map(fn (Booking $b) => [
+                    'id'         => $b->id,
+                    'guest_name' => $b->guest?->name,
+                    'check_in'   => $b->check_in->format('Y-m-d'),
+                    'check_out'  => $b->check_out->format('Y-m-d'),
+                    'status'     => $b->status,
+                ]);
+        }
+
+        return response()->json(['available' => $available, 'conflicts' => $conflicts]);
     }
 }

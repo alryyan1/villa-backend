@@ -25,12 +25,14 @@ class GuestController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'phone'       => 'required|string|max:20',
-            'id_number'   => 'required|string|max:50',
-            'nationality' => 'nullable|string|max:100',
-            'notes'       => 'nullable|string',
+            'name'         => 'required|string|max:255',
+            'phone'        => 'required|string|max:20',
+            'country_code' => 'nullable|string|max:4',
+            'id_number'    => 'required|string|max:50',
+            'nationality'  => 'nullable|string|max:100',
+            'notes'        => 'nullable|string',
         ]);
+        $validated['country_code'] = $validated['country_code'] ?? '968';
 
         $guest = Guest::create($validated);
         ActivityLogService::log('create_guest', 'Guest', $guest->id, ['name' => $guest->name]);
@@ -46,12 +48,14 @@ class GuestController extends Controller
     public function update(Request $request, Guest $guest)
     {
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'phone'       => 'required|string|max:20',
-            'id_number'   => 'required|string|max:50',
-            'nationality' => 'nullable|string|max:100',
-            'notes'       => 'nullable|string',
+            'name'         => 'required|string|max:255',
+            'phone'        => 'required|string|max:20',
+            'country_code' => 'nullable|string|max:4',
+            'id_number'    => 'required|string|max:50',
+            'nationality'  => 'nullable|string|max:100',
+            'notes'        => 'nullable|string',
         ]);
+        $validated['country_code'] = $validated['country_code'] ?? '968';
 
         $guest->update($validated);
         ActivityLogService::log('update_guest', 'Guest', $guest->id, ['name' => $guest->name]);
