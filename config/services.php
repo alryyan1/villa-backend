@@ -44,6 +44,8 @@ return [
         'booking_template_name'   => env('WHATSAPP_BOOKING_TEMPLATE_NAME', ''),
         'booking_template_lang'   => env('WHATSAPP_BOOKING_TEMPLATE_LANG', 'en'),
         'booking_alert_number'    => env('WHATSAPP_BOOKING_ALERT_NUMBER', '96878622990'),
+        'admin_numbers'           => array_filter(array_map('trim', explode(',', env('WHATSAPP_ADMIN_NUMBERS', '')))),
+        'relay_secret'            => env('WHATSAPP_RELAY_SECRET', ''),
     ],
 
 ];

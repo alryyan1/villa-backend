@@ -16,10 +16,15 @@ use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\CleaningLogController;
+use App\Http\Controllers\Api\WhatsAppBotController;
 
 // Public auth routes
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
+
+    // WhatsApp bot webhook relay (server-to-server; authenticated via X-Relay-Secret
+    // header inside the controller, not sanctum — the caller is the Firebase relay function)
+    Route::post('whatsapp-bot/handle-event', [WhatsAppBotController::class, 'handleEvent']);
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {

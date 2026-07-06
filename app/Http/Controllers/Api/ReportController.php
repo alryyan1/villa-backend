@@ -104,6 +104,14 @@ class ReportController extends Controller
             ->withCount(['bookings as cancelled_bookings' => fn($q) => $q->where('status', 'cancelled')->whereBetween('check_in', [$from, $to])])
             ->withSum(['bookings as total_revenue' => fn($q) => $q->whereNotIn('status', ['cancelled'])->whereBetween('check_in', [$from, $to])], 'total_amount')
             ->withSum(['bookings as total_nights' => fn($q) => $q->whereNotIn('status', ['cancelled'])->whereBetween('check_in', [$from, $to])], 'nights')
+            ->selectSub(function ($query) use ($from, $to) {
+                $query->selectRaw('COALESCE(SUM(payments.amount), 0)')
+                    ->from('payments')
+                    ->join('bookings', 'bookings.id', '=', 'payments.booking_id')
+                    ->whereColumn('bookings.villa_id', 'villas.id')
+                    ->whereNotIn('bookings.status', ['cancelled'])
+                    ->whereBetween('bookings.check_in', [$from, $to]);
+            }, 'total_collected')
             ->orderByDesc('total_revenue')
             ->get();
 

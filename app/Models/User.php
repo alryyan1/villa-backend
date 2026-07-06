@@ -50,7 +50,7 @@ class User extends Authenticatable
     use HasFactory, Notifiable, HasApiTokens;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'phone', 'is_active',
+        'name', 'email', 'password', 'role', 'phone', 'is_active', 'permissions',
     ];
 
     protected $hidden = [
@@ -63,6 +63,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
             'is_active'         => 'boolean',
+            'permissions'       => 'array',
         ];
     }
 

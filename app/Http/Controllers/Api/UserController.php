@@ -22,7 +22,7 @@ class UserController extends Controller
             $query->where('role', $request->role);
         }
 
-        return response()->json($query->orderBy('name')->paginate(20));
+        return response()->json($query->orderBy('id','desc')->paginate(20));
     }
 
     public function store(Request $request)
@@ -32,12 +32,14 @@ class UserController extends Controller
         }
 
         $validated = $request->validate([
-            'name'      => 'required|string|max:255',
-            'email'     => 'required|email|unique:users,email',
-            'password'  => 'required|string|min:8',
-            'role'      => 'in:admin,manager,staff',
-            'phone'     => 'nullable|string|max:20',
-            'is_active' => 'boolean',
+            'name'          => 'required|string|max:255',
+            'email'         => 'required|email|unique:users,email',
+            'password'      => 'required|string|min:8',
+            'role'          => 'in:admin,manager,staff',
+            'phone'         => 'nullable|string|max:20',
+            'is_active'     => 'boolean',
+            'permissions'   => 'nullable|array',
+            'permissions.*' => 'string',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -55,12 +57,14 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'name'      => 'sometimes|string|max:255',
-            'email'     => "sometimes|email|unique:users,email,{$user->id}",
-            'password'  => 'sometimes|string|min:8',
-            'role'      => 'sometimes|in:admin,manager,staff',
-            'phone'     => 'nullable|string|max:20',
-            'is_active' => 'sometimes|boolean',
+            'name'          => 'sometimes|string|max:255',
+            'email'         => "sometimes|email|unique:users,email,{$user->id}",
+            'password'      => 'sometimes|string|min:8',
+            'role'          => 'sometimes|in:admin,manager,staff',
+            'phone'         => 'nullable|string|max:20',
+            'is_active'     => 'sometimes|boolean',
+            'permissions'   => 'nullable|array',
+            'permissions.*' => 'string',
         ]);
 
         if (isset($validated['password'])) {

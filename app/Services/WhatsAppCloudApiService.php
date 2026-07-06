@@ -148,6 +148,82 @@ class WhatsAppCloudApiService
         }
     }
 
+    public function uploadMedia(
+        string $binaryContent,
+        string $filename,
+        string $mimeType = 'application/pdf',
+        ?string $accessToken = null,
+        ?string $phoneNumberId = null
+    ): array {
+        $accessToken   = $accessToken   ?? $this->accessToken;
+        $phoneNumberId = $phoneNumberId ?? $this->phoneNumberId;
+
+        if (!$accessToken || !$phoneNumberId) {
+            return ['success' => false, 'error' => 'WhatsApp Cloud API service not configured.', 'data' => null];
+        }
+
+        $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$phoneNumberId}/media";
+
+        try {
+            $response = Http::withToken($accessToken)
+                ->attach('file', $binaryContent, $filename, ['Content-Type' => $mimeType])
+                ->post($endpoint, [
+                    'messaging_product' => 'whatsapp',
+                    'type'              => $mimeType,
+                ]);
+
+            $data = $response->json();
+
+            if ($response->successful() && isset($data['id'])) {
+                return ['success' => true, 'media_id' => $data['id'], 'data' => $data];
+            }
+
+            $error = "Failed to upload media." . (isset($data['error']['message']) ? " Error: {$data['error']['message']}" : '');
+            Log::error("WhatsAppCloudApiService: {$error}", ['response' => $data]);
+            return ['success' => false, 'error' => $error, 'data' => $data];
+        } catch (\Exception $e) {
+            Log::error("WhatsAppCloudApiService uploadMedia Exception: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
+        }
+    }
+
+    public function sendDocumentById(
+        string $to,
+        string $mediaId,
+        ?string $filename = null,
+        ?string $caption = null,
+        ?string $accessToken = null,
+        ?string $phoneNumberId = null
+    ): array {
+        $accessToken   = $accessToken   ?? $this->accessToken;
+        $phoneNumberId = $phoneNumberId ?? $this->phoneNumberId;
+
+        if (!$accessToken || !$phoneNumberId) {
+            return ['success' => false, 'error' => 'WhatsApp Cloud API service not configured.', 'data' => null];
+        }
+
+        $to       = ltrim($to, '+');
+        $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$phoneNumberId}/messages";
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to'       => $to,
+            'type'     => 'document',
+            'document' => ['id' => $mediaId],
+        ];
+
+        if ($filename) $payload['document']['filename'] = $filename;
+        if ($caption)  $payload['document']['caption']  = $caption;
+
+        try {
+            $response = Http::withToken($accessToken)->asJson()->post($endpoint, $payload);
+            return $this->handleResponse($response, 'Document (by media id)');
+        } catch (\Exception $e) {
+            Log::error("WhatsAppCloudApiService sendDocumentById Exception: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
+        }
+    }
+
     public function sendImage(string $to, string $imageUrl, ?string $caption = null, ?string $accessToken = null, ?string $phoneNumberId = null): array
     {
         $accessToken   = $accessToken   ?? $this->accessToken;
