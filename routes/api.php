@@ -47,6 +47,7 @@ Route::prefix('v1')->group(function () {
         Route::post('bookings/check-availability', [BookingController::class, 'checkAvailability']);
         Route::post('bookings/{booking}/confirm-arrival', [BookingController::class, 'confirmArrival']);
         Route::post('bookings/{booking}/confirm-departure', [BookingController::class, 'confirmDeparture']);
+        Route::post('bookings/{booking}/send-checkout-reminder', [BookingController::class, 'sendCheckoutReminder']);
         Route::post('bookings/{booking}/payments', [PaymentController::class, 'store']);
         Route::get('bookings/{booking}/payments', [PaymentController::class, 'index']);
 

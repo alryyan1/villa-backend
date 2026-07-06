@@ -46,7 +46,7 @@ class WhatsAppService
     {
         $booking->load(['villa.owner', 'guest', 'user']);
 
-        $results = ['owner' => null, 'tenant' => null];
+        $results = ['owner' => null, 'tenant' => null, 'user' => null];
 
         // Owner template
         if (Setting::get('owner_notifications_enabled', '1') === '1') {
@@ -61,6 +61,12 @@ class WhatsAppService
         if (Setting::get('tenant_notifications_enabled', '1') !== '0' && $booking->guest->phone) {
             Log::info("WhatsApp: sending booking notification to tenant: {$booking->guest->phone}");
             $results['tenant'] = $this->sendTenantBookingTemplate($booking, $booking->guest->phone);
+        }
+
+        // Same guest template, sent to the staff member who created the booking
+        if ($booking->user->phone) {
+            Log::info("WhatsApp: sending booking notification to logged-in user: {$booking->user->phone}");
+            $results['user'] = $this->sendTenantBookingTemplate($booking, $booking->user->phone);
         }
 
         return $results;
@@ -172,6 +178,16 @@ class WhatsAppService
             ],
         ]];
 
+        // Only attach a button component if the currently-configured template actually
+        // has a "Download Pdf" quick-reply button — the live default template does not,
+        // and Meta rejects button params that don't match the approved template.
+        if (Setting::get('owner_booking_template_has_button', '0') === '1') {
+            $components[] = [
+                'type' => 'button', 'sub_type' => 'quick_reply', 'index' => '0',
+                'parameters' => [['type' => 'payload', 'payload' => "download_pdf:{$booking->id}"]],
+            ];
+        }
+
         $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
 
         if (!$result['success']) {
@@ -215,10 +231,56 @@ class WhatsAppService
             ],
         ]];
 
+        // Only attach a button component if the currently-configured template actually
+        // has a "Download Pdf" quick-reply button — the live default template does not,
+        // and Meta rejects button params that don't match the approved template.
+        if (Setting::get('guest_booking_template_has_button', '0') === '1') {
+            $components[] = [
+                'type' => 'button', 'sub_type' => 'quick_reply', 'index' => '0',
+                'parameters' => [['type' => 'payload', 'payload' => "download_pdf:{$booking->id}"]],
+            ];
+        }
+
         $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
 
         if (!$result['success']) {
             Log::error('WhatsApp tenant template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
+    }
+
+    public function sendCheckoutReminder(Booking $booking): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $templateName = Setting::get('guest_checkout_reminder_template', '');
+        $templateLang = Setting::get('guest_checkout_reminder_template_lang', 'ar');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: checkout reminder template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $phone = $booking->guest->phone ?? null;
+        $normalized = $phone ? WhatsAppCloudApiService::formatPhoneNumber($phone) : null;
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid or missing phone for guest on booking {$booking->id}");
+            return ['sent' => false, 'error' => 'Invalid or missing phone number'];
+        }
+
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => $booking->guest->name],
+                ['type' => 'text', 'text' => $booking->villa->name],
+            ],
+        ]];
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+
+        if (!$result['success']) {
+            Log::error('WhatsApp checkout reminder failed: ' . ($result['error'] ?? 'unknown'));
         }
 
         return ['sent' => $result['success'], 'error' => $result['error'] ?? null];

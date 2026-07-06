@@ -6,14 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Services\ActivityLogService;
 use App\Services\BookingService;
+use App\Services\FirebaseService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class BookingController extends Controller
 {
     public function __construct(
         private BookingService $bookingService,
-        private WhatsAppService $whatsAppService
+        private WhatsAppService $whatsAppService,
+        private FirebaseService $firebaseService
     ) {}
 
     public function index(Request $request)
@@ -100,6 +103,12 @@ class BookingController extends Controller
             'guest' => $booking->guest->name,
         ]);
 
+        try {
+            $this->firebaseService->generateAndStoreBookingConfirmation($booking);
+        } catch (\Throwable $e) {
+            Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
+        }
+
         $whatsapp = $this->whatsAppService->notifyBookingCreated($booking);
 
         return response()->json(['booking' => $booking, 'whatsapp' => $whatsapp], 201);
@@ -153,6 +162,11 @@ class BookingController extends Controller
         if (isset($validated['status']) && $validated['status'] === 'cancelled') {
             $this->whatsAppService->notifyBookingCancelled($booking);
         } else {
+            try {
+                $this->firebaseService->generateAndStoreBookingConfirmation($booking);
+            } catch (\Throwable $e) {
+                Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
+            }
             $this->whatsAppService->notifyBookingUpdated($booking);
         }
 
@@ -180,6 +194,14 @@ class BookingController extends Controller
         $booking->update(['checked_out_at' => now(), 'status' => 'completed']);
         ActivityLogService::log('confirm_departure', 'Booking', $booking->id);
         return response()->json($booking->fresh());
+    }
+
+    public function sendCheckoutReminder(Booking $booking)
+    {
+        $booking->load(['villa', 'guest']);
+        $result = $this->whatsAppService->sendCheckoutReminder($booking);
+        ActivityLogService::log('send_checkout_reminder', 'Booking', $booking->id);
+        return response()->json($result);
     }
 
     public function destroy(Booking $booking)

@@ -15,6 +15,10 @@ class SettingController extends Controller
         'owner_booking_template_lang',
         'guest_booking_template',
         'guest_booking_template_lang',
+        'guest_checkout_reminder_template',
+        'guest_checkout_reminder_template_lang',
+        'owner_booking_template_has_button',
+        'guest_booking_template_has_button',
     ];
 
     public function index()
@@ -39,10 +43,14 @@ class SettingController extends Controller
             'owner_booking_template_lang' => 'sometimes|nullable|string|max:20',
             'guest_booking_template'      => 'sometimes|nullable|string|max:100',
             'guest_booking_template_lang' => 'sometimes|nullable|string|max:20',
+            'guest_checkout_reminder_template'      => 'sometimes|nullable|string|max:100',
+            'guest_checkout_reminder_template_lang' => 'sometimes|nullable|string|max:20',
+            'owner_booking_template_has_button'     => 'sometimes|boolean',
+            'guest_booking_template_has_button'     => 'sometimes|boolean',
         ]);
 
         foreach ($validated as $key => $value) {
-            if (in_array($key, ['whatsapp_enabled', 'owner_notifications_enabled'], true)) {
+            if (in_array($key, ['whatsapp_enabled', 'owner_notifications_enabled', 'owner_booking_template_has_button', 'guest_booking_template_has_button'], true)) {
                 Setting::set($key, $value ? '1' : '0');
             } else {
                 Setting::set($key, $value ?? '');

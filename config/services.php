@@ -48,4 +48,9 @@ return [
         'relay_secret'            => env('WHATSAPP_RELAY_SECRET', ''),
     ],
 
+    'firebase' => [
+        'credentials_path' => env('FIREBASE_CREDENTIALS_PATH', ''),
+        'storage_bucket'   => env('FIREBASE_STORAGE_BUCKET', ''),
+    ],
+
 ];

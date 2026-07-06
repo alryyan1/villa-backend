@@ -38,24 +38,27 @@ class VillaController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 999);
         $paginated = $query->orderBy('name')->paginate($perPage);
 
-        $asOf     = $request->input('as_of', now()->toDateString());
-        $isToday  = $asOf === now()->toDateString();
-        $villaIds = $paginated->pluck('id');
+        $today     = now()->toDateString();
+        $asOfStart = $request->input('as_of_start', $request->input('as_of', $today));
+        $asOfEnd   = $request->input('as_of_end', $request->input('as_of', $today));
+        $isToday   = $asOfStart === $today && $asOfEnd === $today;
+        $villaIds  = $paginated->pluck('id');
 
+        // A villa is "occupied" if any booking overlaps the [asOfStart, asOfEnd] range at all
         $occupiedIds = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
-            ->whereDate('check_in', '<=', $asOf)
-            ->whereDate('check_out', '>=', $asOf)
+            ->whereDate('check_in', '<=', $asOfEnd)
+            ->whereDate('check_out', '>=', $asOfStart)
             ->pluck('villa_id')
             ->flip()
             ->all();
 
-        // Guests physically inside (arrived today or earlier, not yet departed)
+        // Guests physically inside (arrived today or earlier, not yet departed) — only meaningful for the "today" view
         $checkingInTodayIds = $isToday
             ? Booking::whereIn('villa_id', $villaIds)
                 ->whereIn('status', ['confirmed', 'pending'])
                 ->whereNotNull('checked_in_at')
-                ->whereDate('check_out', '>=', $asOf)
+                ->whereDate('check_out', '>=', $today)
                 ->pluck('villa_id')
                 ->flip()
                 ->all()
@@ -65,7 +68,7 @@ class VillaController extends Controller
         $awaitingArrivalIds = $isToday
             ? Booking::whereIn('villa_id', $villaIds)
                 ->whereIn('status', ['confirmed', 'pending'])
-                ->whereDate('check_in', $asOf)
+                ->whereDate('check_in', $today)
                 ->whereNull('checked_in_at')
                 ->pluck('villa_id')
                 ->flip()
@@ -74,8 +77,8 @@ class VillaController extends Controller
 
         $activeBookings = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
-            ->whereDate('check_in', '<=', $asOf)
-            ->whereDate('check_out', '>=', $asOf)
+            ->whereDate('check_in', '<=', $asOfEnd)
+            ->whereDate('check_out', '>=', $asOfStart)
             ->with('guest:id,name')
             ->get(['id', 'villa_id', 'checked_in_at', 'checked_out_at', 'payment_status'])
             ->keyBy('villa_id');

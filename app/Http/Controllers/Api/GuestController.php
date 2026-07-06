@@ -26,8 +26,8 @@ class GuestController extends Controller
     {
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
-            'phone'       => 'nullable|string|max:20',
-            'id_number'   => 'nullable|string|max:50',
+            'phone'       => 'required|string|max:20',
+            'id_number'   => 'required|string|max:50',
             'nationality' => 'nullable|string|max:100',
             'notes'       => 'nullable|string',
         ]);
@@ -46,9 +46,9 @@ class GuestController extends Controller
     public function update(Request $request, Guest $guest)
     {
         $validated = $request->validate([
-            'name'        => 'sometimes|string|max:255',
-            'phone'       => 'nullable|string|max:20',
-            'id_number'   => 'nullable|string|max:50',
+            'name'        => 'required|string|max:255',
+            'phone'       => 'required|string|max:20',
+            'id_number'   => 'required|string|max:50',
             'nationality' => 'nullable|string|max:100',
             'notes'       => 'nullable|string',
         ]);
