@@ -76,6 +76,14 @@ class BookingController extends Controller
             return response()->json(['message' => 'This villa is under maintenance and cannot be booked.'], 422);
         }
 
+        if (
+            Setting::get('enforce_contract_end_date', '1') === '1'
+            && $villa->contract_end_date
+            && $validated['check_out'] > $villa->contract_end_date->format('Y-m-d')
+        ) {
+            return response()->json(['message' => 'The checkout date is after this villa\'s management contract ends on ' . $villa->contract_end_date->format('Y-m-d') . '.'], 422);
+        }
+
         if (!$this->bookingService->checkAvailability($validated['villa_id'], $validated['check_in'], $validated['check_out'])) {
             return response()->json(['message' => 'The villa is already booked for this period.'], 422);
         }
@@ -149,8 +157,20 @@ class BookingController extends Controller
             }
         }
 
+        if (isset($validated['check_in']) || isset($validated['check_out']) || isset($validated['villa_id'])) {
+            $villa = \App\Models\Villa::find($villaId);
+
+            if (
+                Setting::get('enforce_contract_end_date', '1') === '1'
+                && $villa->contract_end_date
+                && $checkOut > $villa->contract_end_date->format('Y-m-d')
+            ) {
+                return response()->json(['message' => 'The checkout date is after this villa\'s management contract ends on ' . $villa->contract_end_date->format('Y-m-d') . '.'], 422);
+            }
+        }
+
         if (isset($validated['check_in']) || isset($validated['check_out'])) {
-            $villa                     = \App\Models\Villa::find($villaId);
+            $villa                     ??= \App\Models\Villa::find($villaId);
             $validated['nights']       = $this->bookingService->calculateNights($checkIn, $checkOut);
             $validated['total_amount'] = $this->bookingService->calculateTotal($villa, $validated['nights']);
         }

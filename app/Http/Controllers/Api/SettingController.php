@@ -12,6 +12,7 @@ class SettingController extends Controller
         'whatsapp_enabled',
         'owner_notifications_enabled',
         'booking_confirmation_notify_enabled',
+        'enforce_contract_end_date',
         'owner_booking_template',
         'owner_booking_template_lang',
         'guest_booking_template',
@@ -44,6 +45,7 @@ class SettingController extends Controller
             'whatsapp_enabled'            => 'sometimes|boolean',
             'owner_notifications_enabled' => 'sometimes|boolean',
             'booking_confirmation_notify_enabled' => 'sometimes|boolean',
+            'enforce_contract_end_date'   => 'sometimes|boolean',
             'owner_booking_template'      => 'sometimes|nullable|string|max:100',
             'owner_booking_template_lang' => 'sometimes|nullable|string|max:20',
             'guest_booking_template'      => 'sometimes|nullable|string|max:100',
@@ -58,7 +60,7 @@ class SettingController extends Controller
         ]);
 
         foreach ($validated as $key => $value) {
-            if (in_array($key, ['whatsapp_enabled', 'owner_notifications_enabled', 'booking_confirmation_notify_enabled', 'owner_booking_template_has_button', 'guest_booking_template_has_button', 'guest_pending_booking_template_has_button'], true)) {
+            if (in_array($key, ['whatsapp_enabled', 'owner_notifications_enabled', 'booking_confirmation_notify_enabled', 'enforce_contract_end_date', 'owner_booking_template_has_button', 'guest_booking_template_has_button', 'guest_pending_booking_template_has_button'], true)) {
                 Setting::set($key, $value ? '1' : '0');
             } else {
                 Setting::set($key, $value ?? '');
