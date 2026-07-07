@@ -80,7 +80,7 @@ class VillaController extends Controller
             ->whereDate('check_in', '<=', $asOfEnd)
             ->whereDate('check_out', '>=', $asOfStart)
             ->with('guest:id,name')
-            ->get(['id', 'villa_id', 'check_in', 'check_out', 'checked_in_at', 'checked_out_at', 'payment_status'])
+            ->get(['id', 'villa_id', 'guest_id', 'check_in', 'check_out', 'checked_in_at', 'checked_out_at', 'payment_status'])
             ->keyBy('villa_id');
 
         // Bookings count per villa for the current calendar month (by check-in date)

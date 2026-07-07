@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\Setting;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Factory;
@@ -83,6 +84,11 @@ class FirebaseService
      */
     public function generateAndStoreBookingConfirmation(Booking $booking): void
     {
+        if (Setting::get('firebase_upload_enabled', '1') !== '1') {
+            Log::info("FirebaseService: disabled via settings — skipping confirmation PDF for booking {$booking->id}.");
+            return;
+        }
+
         if (!$this->isConfigured()) {
             Log::info("FirebaseService: not configured — skipping confirmation PDF for booking {$booking->id}.");
             return;
