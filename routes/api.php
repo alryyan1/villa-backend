@@ -51,6 +51,7 @@ Route::prefix('v1')->group(function () {
         Route::post('bookings/{booking}/send-checkout-reminder', [BookingController::class, 'sendCheckoutReminder']);
         Route::post('bookings/{booking}/payments', [PaymentController::class, 'store']);
         Route::get('bookings/{booking}/payments', [PaymentController::class, 'index']);
+        Route::delete('bookings/{booking}/payments/{payment}', [PaymentController::class, 'destroy']);
 
         // Dashboard
         Route::get('dashboard/stats', [DashboardController::class, 'stats']);

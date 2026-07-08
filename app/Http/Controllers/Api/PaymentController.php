@@ -18,6 +18,26 @@ class PaymentController extends Controller
         return response()->json($booking->payments()->with('user')->orderByDesc('payment_date')->get());
     }
 
+    public function destroy(Booking $booking, Payment $payment)
+    {
+        if ($payment->booking_id !== $booking->id) {
+            abort(404);
+        }
+
+        ActivityLogService::log('delete_payment', 'Payment', $payment->id, [
+            'booking_id' => $booking->id,
+            'amount'     => $payment->amount,
+        ]);
+
+        $payment->delete();
+        $this->bookingService->updatePaymentStatus($booking);
+
+        return response()->json([
+            'message' => 'Payment deleted successfully.',
+            'booking' => $booking->fresh(),
+        ]);
+    }
+
     public function store(Request $request, Booking $booking)
     {
         $validated = $request->validate([
