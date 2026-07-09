@@ -43,6 +43,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('owners', OwnerController::class);
         Route::apiResource('guests', GuestController::class);
 
+        Route::get('bookings/progress/{token}', [BookingController::class, 'progress']);
         Route::apiResource('bookings', BookingController::class);
         Route::post('bookings/check-availability', [BookingController::class, 'checkAvailability']);
         Route::post('bookings/{booking}/confirm', [BookingController::class, 'confirmBooking']);

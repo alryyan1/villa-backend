@@ -1,160 +1,135 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Booking Confirmation #{{ $booking->id }}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:DejaVu Sans, Arial, sans-serif;font-size:13px;color:#222;background:#fff}
-  .page{width:760px;margin:0 auto;border:1px solid #bbb}
-  /* header */
-  .hdr{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 22px 12px}
-  .logo{font-family:Georgia,serif;font-size:30px;font-weight:700;letter-spacing:0.18em;color:#4a3000}
-  .logo-sub{font-size:10px;letter-spacing:0.22em;color:#8B6914;margin-top:2px}
-  .logo-dots{display:flex;gap:5px;margin-top:6px}
-  .logo-dot{width:12px;height:12px;border-radius:50%}
-  .ttl{text-align:right}
-  .ttl h1{font-size:24px;font-weight:700;color:#222}
-  .ttl h1 span{color:#c00}
-  .ttl p{font-size:10.5px;color:#666;max-width:300px;margin-top:4px;text-align:right}
-  /* band */
-  .band{background:#C9A96E;padding:5px 12px;font-size:11px;color:#fff;font-weight:600;letter-spacing:0.06em;white-space:nowrap;overflow:hidden}
-  /* two-col */
-  .body{display:flex;border-bottom:1px solid #ddd}
-  .lcol{flex:1;padding:14px 18px;border-right:1px solid #ddd}
-  .rcol{width:250px;padding:14px 18px}
-  .f{display:flex;margin-bottom:9px;align-items:baseline}
-  .fl{width:148px;color:#555;flex-shrink:0;font-size:12px}
-  .fv{font-weight:600}
-  .fvbox{border:1px solid #bbb;padding:2px 10px;text-align:center;min-width:60px;display:inline-block}
-  /* policy */
-  .policy{padding:8px 18px;background:#fafafa;border-bottom:1px solid #ddd;font-size:11.5px}
-  /* dates */
-  .dates{display:flex;gap:36px;padding:14px 18px;border-bottom:1px solid #ddd;align-items:flex-end}
-  .db label{font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#666;display:block;margin-bottom:4px}
-  .db .dv{font-size:16px;font-weight:700;border:1px solid #aaa;padding:5px 18px;display:inline-block}
-  /* payments table */
-  .ptable{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
-  .ptable th{background:#f5f5f5;padding:5px 8px;border:1px solid #ddd;text-align:left;font-weight:600}
-  .ptable td{padding:5px 8px;border:1px solid #ddd}
-  /* booked-by */
-  .bb{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 18px;border-bottom:1px solid #ddd}
-  .stamp{width:88px;height:64px;border:1px solid #bbb;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10px;text-align:center;line-height:1.5}
-  /* footer */
-  .fnote{padding:10px 18px;background:#fffbe6;border-top:1px solid #ffe58f;font-size:11px;color:#7c5c00}
-  .section-title{font-weight:700;font-size:12px;margin-bottom:10px;color:#4a3000;border-bottom:1px solid #e8d5a3;padding-bottom:4px}
-  .green{color:#389e0d}.orange{color:#d46b08}.red{color:#cf1322}
-</style>
-</head>
-<body>
-<div class="page">
-  <div class="hdr">
-    <div>
-      <div class="logo">Al Seef</div>
-      <div class="logo-sub">LUXURY WATERFRONT LIVING</div>
-      <div class="logo-dots">
-        <div class="logo-dot" style="background:#C9A96E"></div>
-        <div class="logo-dot" style="background:#8B6914"></div>
-        <div class="logo-dot" style="background:#D4B896"></div>
-        <div class="logo-dot" style="background:#A0784A"></div>
-        <div class="logo-dot" style="background:#C9A96E"></div>
-      </div>
-    </div>
-    <div class="ttl">
-      <h1>Booking <span>Confirmation</span></h1>
-      <p>Please present either an electronic or paper copy of this confirmation upon check-in.</p>
-    </div>
-  </div>
+@php
+  $band = str_repeat('Al Seef &nbsp;&nbsp;&middot;&nbsp;&nbsp;', 12);
+@endphp
+<table cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td width="50%" style="font-family:helvetica;">
+      <span style="font-size:15pt;font-weight:bold;color:#4a3000;">Al Seef</span><br/>
+      <span style="font-size:6pt;color:#8B6914;letter-spacing:2px;">LUXURY WATERFRONT LIVING</span>
+    </td>
+    <td width="50%" style="text-align:right;font-family:helvetica;">
+      <span style="font-size:12pt;font-weight:bold;color:#222222;">Booking <span style="color:#cc0000;">Confirmation</span></span><br/>
+      <span style="font-size:6.5pt;color:#666666;">Please present either an electronic or paper copy of this confirmation upon check-in.</span>
+    </td>
+  </tr>
+</table>
 
-  <div class="band">{{ str_repeat('Al Seef &nbsp;&nbsp;·&nbsp;&nbsp;', 10) }}</div>
+<table cellpadding="3" cellspacing="0" width="100%">
+  <tr>
+    <td bgcolor="#C9A96E" style="color:#ffffff;font-size:6.5pt;font-weight:bold;font-family:helvetica;">{!! $band !!}</td>
+  </tr>
+</table>
 
-  <div class="body">
-    <div class="lcol">
-      <div class="section-title">Guest &amp; Booking Information</div>
-      <div class="f"><span class="fl">Booking ID :</span><span class="fv">{{ $booking->id }}</span></div>
-      <div class="f"><span class="fl">Client :</span><span class="fv" style="font-size:14px">{{ $booking->guest->name ?? '—' }}</span></div>
+<table cellpadding="3" cellspacing="0" width="100%">
+  <tr>
+    <td width="60%" style="border:1px solid #dddddd;font-family:helvetica;font-size:7.5pt;vertical-align:top;">
+      <span style="font-size:8pt;font-weight:bold;color:#4a3000;">Guest &amp; Booking Information</span><br/>
+      <span style="color:#555555;">Booking ID:</span> <span style="font-weight:bold;">{{ $booking->id }}</span><br/>
+      <span style="color:#555555;">Client:</span> <span style="font-weight:bold;font-size:9.5pt;">{{ $booking->guest->name ?? '—' }}</span><br/>
       @if($booking->guest->id_number ?? null)
-        <div class="f"><span class="fl">Civil / Passport ID :</span><span class="fv">{{ $booking->guest->id_number }}</span></div>
+        <span style="color:#555555;">Civil / Passport ID:</span> <span style="font-weight:bold;">{{ $booking->guest->id_number }}</span><br/>
       @endif
       @if($booking->guest->nationality ?? null)
-        <div class="f"><span class="fl">Nationality :</span><span class="fv">{{ $booking->guest->nationality }}</span></div>
+        <span style="color:#555555;">Nationality:</span> <span style="font-weight:bold;">{{ $booking->guest->nationality }}</span><br/>
       @endif
       @if($booking->guest->phone ?? null)
-        <div class="f"><span class="fl">Phone :</span><span class="fv">{{ $booking->guest->phone }}</span></div>
+        <span style="color:#555555;">Phone:</span> <span style="font-weight:bold;">{{ $booking->guest->phone }}</span><br/>
       @endif
-      <div class="f" style="margin-top:10px"><span class="fl">Property :</span><span class="fv">{{ $booking->villa->name ?? '—' }}</span></div>
+      <span style="color:#555555;">Property:</span> <span style="font-weight:bold;">{{ $booking->villa->name ?? '—' }}</span><br/>
       @if($booking->villa->category ?? null)
-        <div class="f"><span class="fl">Villa Type :</span><span class="fv">{{ $booking->villa->category }}</span></div>
+        <span style="color:#555555;">Villa Type:</span> <span style="font-weight:bold;">{{ $booking->villa->category }}</span><br/>
       @endif
       @if($booking->check_in_time)
-        <div class="f"><span class="fl">Check-in Time :</span><span class="fv">{{ $booking->check_in_time }}</span></div>
+        <span style="color:#555555;">Check-in Time:</span> <span style="font-weight:bold;">{{ $booking->check_in_time }}</span>
       @endif
-    </div>
-    <div class="rcol">
-      <div class="section-title">Stay Details</div>
-      <div class="f"><span class="fl">Number of Guests :</span><span class="fv fvbox">{{ $booking->num_guests ?? 1 }}</span></div>
+    </td>
+    <td width="40%" style="border:1px solid #dddddd;font-family:helvetica;font-size:7.5pt;vertical-align:top;">
+      <span style="font-size:8pt;font-weight:bold;color:#4a3000;">Stay Details</span><br/>
+      <span style="color:#555555;">Guests:</span> <span style="font-weight:bold;">{{ $booking->num_guests ?? 1 }}</span><br/>
       @if($booking->villa->num_rooms ?? null)
-        <div class="f"><span class="fl">Rooms :</span><span class="fv fvbox">{{ $booking->villa->num_rooms }}</span></div>
+        <span style="color:#555555;">Rooms:</span> <span style="font-weight:bold;">{{ $booking->villa->num_rooms }}</span><br/>
       @endif
-      <div class="f"><span class="fl">Nights :</span><span class="fv fvbox">{{ $booking->nights }}</span></div>
-      <div class="f" style="margin-top:12px"><span class="fl">Total Amount :</span><span class="fv">{{ $omr($booking->total_amount) }}</span></div>
-      <div class="f"><span class="fl">Amount Paid :</span><span class="fv green">{{ $omr($booking->paid_amount) }}</span></div>
-      <div class="f"><span class="fl">Remaining :</span><span class="fv {{ $remaining > 0 ? 'orange' : 'green' }}">{{ $omr($remaining) }}</span></div>
-      <div class="f" style="margin-top:8px"><span class="fl">Payment Status :</span><span class="fv">{{ strtoupper($booking->payment_status ?? '') }}</span></div>
-    </div>
-  </div>
+      <span style="color:#555555;">Nights:</span> <span style="font-weight:bold;">{{ $booking->nights }}</span><br/>
+      <span style="color:#555555;">Total:</span> <span style="font-weight:bold;">{{ $omr($booking->total_amount) }}</span><br/>
+      <span style="color:#555555;">Paid:</span> <span style="font-weight:bold;color:#389e0d;">{{ $omr($booking->paid_amount) }}</span><br/>
+      <span style="color:#555555;">Remaining:</span> <span style="font-weight:bold;color:{{ $remaining > 0 ? '#d46b08' : '#389e0d' }};">{{ $omr($remaining) }}</span><br/>
+      <span style="color:#555555;">Status:</span> <span style="font-weight:bold;">{{ strtoupper($booking->payment_status ?? '') }}</span>
+    </td>
+  </tr>
+</table>
 
-  <div class="policy">
-    <strong>Booking Status:</strong> {{ strtoupper($booking->status ?? '') }}
-    @if($booking->notes)
-      &nbsp;&nbsp;&nbsp;<strong>Notes:</strong> {{ $booking->notes }}
-    @endif
-  </div>
+<table cellpadding="3" cellspacing="0" width="100%">
+  <tr>
+    <td bgcolor="#fafafa" style="border:1px solid #dddddd;font-family:helvetica;font-size:6.5pt;">
+      <b>Booking Status:</b> {{ strtoupper($booking->status ?? '') }}
+      @if($booking->notes)
+        &nbsp;&nbsp;<b>Notes:</b> {{ $booking->notes }}
+      @endif
+    </td>
+  </tr>
+</table>
 
-  <div class="dates">
-    <div class="db">
-      <label>Arrival</label>
-      <div class="dv">{{ $booking->check_in->format('F j, Y') }}@if($booking->check_in_time) &nbsp;@&nbsp; {{ $booking->check_in_time }} @endif</div>
-    </div>
-    <div class="db">
-      <label>Departure</label>
-      <div class="dv">{{ $booking->check_out->format('F j, Y') }}</div>
-    </div>
-  </div>
+<table cellpadding="3" cellspacing="0" width="100%">
+  <tr>
+    <td width="50%" style="font-family:helvetica;font-size:6pt;color:#666666;">
+      ARRIVAL&nbsp; <span style="font-size:9pt;font-weight:bold;color:#111111;border:1px solid #aaaaaa;">&nbsp;{{ $booking->check_in->format('j M Y') }}@if($booking->check_in_time) &nbsp;@&nbsp;{{ $booking->check_in_time }}@endif&nbsp;</span>
+    </td>
+    <td width="50%" style="font-family:helvetica;font-size:6pt;color:#666666;">
+      DEPARTURE&nbsp; <span style="font-size:9pt;font-weight:bold;color:#111111;border:1px solid #aaaaaa;">&nbsp;{{ $booking->check_out->format('j M Y') }}&nbsp;</span>
+    </td>
+  </tr>
+</table>
 
-  @if($booking->payments->isNotEmpty())
-  <div style="padding:14px 18px;border-bottom:1px solid #ddd">
-    <div class="section-title">Payments Received</div>
-    <table class="ptable">
-      <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Recorded By</th><th>Notes</th></tr></thead>
-      <tbody>
-        @foreach($booking->payments as $p)
-        <tr>
-          <td>{{ $p->payment_date ?? '—' }}</td>
-          <td>{{ $omr($p->amount) }}</td>
-          <td>{{ $methodLabels[$p->method] ?? $p->method }}</td>
-          <td>{{ $p->user->name ?? '—' }}</td>
-          <td>{{ $p->notes ?? '—' }}</td>
-        </tr>
-        @endforeach
-      </tbody>
-    </table>
-  </div>
-  @endif
+<hr style="color:#C9A96E;height:1pt;margin:2pt 0;"/>
 
-  <div class="bb">
-    <div style="font-size:12px;line-height:1.8">
-      <strong>Al Seef — Luxury Waterfront Living</strong><br>
-      Muscat, Sultanate of Oman<br>
-      <span style="color:#888;font-size:11px">Generated: {{ $generatedAt }}</span>
-    </div>
-    <div class="stamp">Authorized<br>Stamp &amp;<br>Signature</div>
-  </div>
+<!--RTL_START-->
+<div style="font-family:amiri;font-size:5.8pt;line-height:1.15;color:#444444;text-align:right;" dir="rtl">
+  <p style="margin:0 0 3pt;text-align:center;font-size:8.5pt;font-weight:bold;color:#8B6914;">الأحكام والشروط</p>
 
-  <div class="fnote">
-    <strong>Note to guest:</strong> Please present a valid photo ID upon check-in. This confirmation serves as your official booking receipt.
-    For inquiries please contact the Al Seef reception.
-  </div>
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;"><span dir="ltr">Check-in &amp; Check-out</span></p>
+  <p style="margin:0 0 1pt;">وقت الدخول: تبدأ عملية تسجيل الدخول واستلام الفيلا من الساعة <b><span dir="ltr">1:00</span> ظهراً</b> وحتى الساعة <b><span dir="ltr">2:00</span> ظهراً</b>.</p>
+  <p style="margin:0 0 1pt;">وقت المغادرة: يجب الالتزام بتسجيل الخروج النهائي وتسليم المفاتيح في تمام الساعة <b><span dir="ltr">10:00</span> صباحاً</b> كحد أقصى.</p>
+  <p style="margin:0 0 1pt;color:#cf1322;font-weight:bold;">تنويه هام: أي تأخير في إخلاء الفيلا عن الوقت المحدد (<span dir="ltr">10:00</span> صباحاً) يتسبب تلقائياً في تعطيل جدول التعقيم والصيانة للحجوزات التالية، ويترتب عليه خصم مالي مباشر من مبلغ التأمين.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">مبلغ التأمين</p>
+  <p style="margin:0 0 1pt;">يتم دفع تأمين مسترد قبل الدخول للفيلا وقدره <b><span dir="ltr">50</span> ريال عماني</b>.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">نظافة الفيلا</p>
+  <p style="margin:0 0 1pt;">يجب تسليم الفيلا نظيفة كما تم استلامها، حيث إن عدم الالتزام بالنظافة العامة سيؤدي إلى خصم مبلغ من التأمين.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">رمال الشاطئ</p>
+  <p style="margin:0 0 1pt;">حرصاً على نظافة الفيلا وراحتكم، يُرجى التكرم بغسل الأرجل وإزالة رمال الشاطئ تماماً قبل الدخول.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">الأثاث</p>
+  <p style="margin:0 0 1pt;">يمنع منعاً باتاً تحريك أو نقل الأثاث من مكانه المخصص.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">النفايات</p>
+  <p style="margin:0 0 1pt;">يرجى وضع النفايات في الأكياس المخصصة لها، ويمكنكم طلب أكياس إضافية من مكتب الإدارة عند الحاجة.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">الملابس المبللة</p>
+  <p style="margin:0 0 1pt;">يرجى تجنب الجلوس بملابس السباحة المبللة على أثاث الفيلا الداخلي بعد العودة من الشاطئ.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">بند إخلاء المسؤولية القانونية التام (<span dir="ltr">Liability &amp; Safety Disclaimer</span>)</p>
+  <p style="margin:0 0 1pt;"><b>إخلاء مسؤولية الحوادث والإصابات:</b> تخلي إدارة مجمع فلل السيف السكنية مسؤوليتها القانونية والتامة عن أي حوادث، إصابات شخصية، حالات غرق (لا قدر الله)، أو أي عارض صحي قد يحدث للمستأجر أو مرافقيه أو زواره طوال فترة الإقامة داخل الفيلا، أو عند استخدام المرافق التابعة للمجمع، أو الشاطئ المحاذي.</p>
+  <p style="margin:0 0 1pt;"><b>مسؤولية الأطفال والمرافقين:</b> يتحمل المستأجر الرئيسي المسؤولية القانونية والمدنية الكاملة عن سلامته وسلامة جميع الأفراد المرافقين له والزوار، ويلتزم التزاماً تاماً بمراقبة الأطفال مراقبة لصيقة ودائمة طوال فترة تواجدهم في الفيلا أو عند اقترابهم من الشاطئ والمرافق المفتوحة.</p>
+  <p style="margin:0 0 1pt;"><b>المفقودات والثمينات:</b> إدارة المجمع غير مسؤولة إطلاقاً عن فقدان، سرقة، أو تلف أي مقتنيات شخصية، مجوهرات، أموال، أو أجهزة خاصة بالضيوف داخل الفيلا أثناء فترة الإقامة أو بعد المغادرة.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">الإقرار والموافقة القانونية (<span dir="ltr">Booking Confirmation &amp; Acceptance</span>)</p>
+  <p style="margin:0 0 1pt;background-color:#fffbe6;">إن إتمامكم لعملية دفع المبالغ المستحقة (سواء العربون أو كامل المبلغ) وتأكيد الحجز، يُعد بمثابة توقيع إلكتروني، وموافقة نهائية قطعية وتعهداً تاماً منكم بالالتزام بكافة الشروط، الأحكام، والسياسات المذكورة في هذه الوثيقة، وتحملكم المسؤولية القانونية والمالية المترتبة على أي مخالفة لبنودها.</p>
+
+  <p style="margin:2pt 0 0;text-align:center;font-weight:bold;color:#8B6914;">نتمنى لكم إقامة مريحة ورحلة سعيدة في فلل السيف</p>
 </div>
-</body>
-</html>
+<!--RTL_END-->
+
+<table cellpadding="3" cellspacing="0" width="100%">
+  <tr>
+    <td width="70%" style="font-family:helvetica;font-size:7pt;line-height:1.4;">
+      <b>Al Seef &mdash; Luxury Waterfront Living</b><br/>
+      Muscat, Sultanate of Oman<br/>
+      <span style="color:#888888;font-size:6pt;">Generated: {{ $generatedAt }}</span>
+    </td>
+    <td width="30%" style="font-family:helvetica;font-size:6pt;color:#aaaaaa;text-align:center;border:1px solid #bbbbbb;">
+      Authorized<br/>Stamp &amp; Signature
+    </td>
+  </tr>
+</table>

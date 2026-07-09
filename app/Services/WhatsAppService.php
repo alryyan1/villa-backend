@@ -78,10 +78,11 @@ class WhatsAppService
             $results['tenant'] = ['sent' => false, 'error' => 'Tenant notifications disabled'];
         }
 
-        // Same guest template, sent to the staff member who created the booking
+        // Staff member who created the booking — its own dedicated template, sent
+        // regardless of the booking's confirmed/pending status.
         if ($booking->user->phone) {
             Log::info("WhatsApp: sending booking notification to logged-in user: {$booking->user->phone}");
-            $results['user'] = $tenantTemplateSender($booking, $booking->user->phone, '968');
+            $results['user'] = $this->sendUserBookingTemplate($booking, $booking->user->phone);
         } else {
             $results['user'] = $noPhone;
         }
@@ -263,6 +264,57 @@ class WhatsAppService
 
         if (!$result['success']) {
             Log::error('WhatsApp tenant template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
+    }
+
+    private function sendUserBookingTemplate(Booking $booking, string $phone): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $templateName = Setting::get('user_booking_template', '');
+        $templateLang = Setting::get('user_booking_template_lang', 'ar');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: user booking template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone, '968');
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for user: {$phone}");
+            return ['sent' => false, 'error' => 'Invalid phone number'];
+        }
+
+        $remaining = (float) $booking->total_amount - (float) $booking->paid_amount;
+
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => $booking->villa->name],
+                ['type' => 'text', 'text' => (string) $booking->id],
+                ['type' => 'text', 'text' => $booking->guest->phone ?? ''],
+                ['type' => 'text', 'text' => $booking->check_in->format('Y-m-d')],
+                ['type' => 'text', 'text' => (string) $booking->nights],
+                ['type' => 'text', 'text' => number_format($remaining, 3)],
+            ],
+        ]];
+
+        // Only attach a button component if the currently-configured template actually
+        // has a "Download Pdf" quick-reply button — the live default template does not,
+        // and Meta rejects button params that don't match the approved template.
+        if (Setting::get('user_booking_template_has_button', '0') === '1') {
+            $components[] = [
+                'type' => 'button', 'sub_type' => 'quick_reply', 'index' => '0',
+                'parameters' => [['type' => 'payload', 'payload' => "download_pdf:{$booking->id}"]],
+            ];
+        }
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+
+        if (!$result['success']) {
+            Log::error('WhatsApp user template failed: ' . ($result['error'] ?? 'unknown'));
         }
 
         return ['sent' => $result['success'], 'error' => $result['error'] ?? null];

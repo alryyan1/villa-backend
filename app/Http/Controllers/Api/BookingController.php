@@ -10,6 +10,7 @@ use App\Services\BookingService;
 use App\Services\FirebaseService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class BookingController extends Controller
@@ -49,6 +50,24 @@ class BookingController extends Controller
         return response()->json($query->orderByDesc('id')->paginate(20));
     }
 
+    /**
+     * Polled by the frontend during booking creation to show live progress
+     * (uploading PDF / sending WhatsApp / sent / done). The token is generated
+     * client-side and passed into store() as `progress_token`, so polling can
+     * start immediately without waiting for the create request to resolve.
+     */
+    public function progress(string $token)
+    {
+        return response()->json(['stage' => Cache::get("booking_progress:{$token}")]);
+    }
+
+    private function setProgress(?string $token, string $stage): void
+    {
+        if ($token) {
+            Cache::put("booking_progress:{$token}", $stage, 120);
+        }
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -62,11 +81,23 @@ class BookingController extends Controller
             'notes'            => 'nullable|string',
             'payment_notes'    => 'nullable|string',
             'price_per_night'  => 'nullable|numeric|min:0.001',
-            'advance_amount'   => 'nullable|numeric|min:0.01',
-            'advance_method'   => 'nullable|in:cash,card,bank_transfer|required_with:advance_amount',
+            'advance_amount'   => 'required|numeric|min:0.01',
+            'advance_method'   => 'required|in:cash,card,bank_transfer',
+            'progress_token'   => 'nullable|string|max:64',
         ]);
 
-        $villa = \App\Models\Villa::findOrFail($validated['villa_id']);
+        $progressToken = $validated['progress_token'] ?? null;
+
+        $villa = \App\Models\Villa::with('owner')->findOrFail($validated['villa_id']);
+        $guest = \App\Models\Guest::findOrFail($validated['guest_id']);
+
+        if (!$villa->owner || !($villa->owner->whatsapp_number ?? $villa->owner->phone)) {
+            return response()->json(['message' => 'This villa\'s owner has no phone number on file. Add one before creating a booking.'], 422);
+        }
+
+        if (!$guest->phone) {
+            return response()->json(['message' => 'This guest has no phone number on file. Add one before creating a booking.'], 422);
+        }
 
         if (!$villa->contract_active) {
             return response()->json(['message' => 'This villa does not have an active management contract and cannot be booked.'], 422);
@@ -95,7 +126,7 @@ class BookingController extends Controller
         $validated['total_amount'] = round($effectiveRate * $nights, 3);
         $validated['status']       = $validated['status'] ?? 'confirmed';
 
-        $bookingData = collect($validated)->except(['advance_amount', 'advance_method', 'price_per_night'])->all();
+        $bookingData = collect($validated)->except(['advance_amount', 'advance_method', 'price_per_night', 'progress_token'])->all();
         $booking = Booking::create($bookingData);
 
         if (!empty($validated['advance_amount'])) {
@@ -116,13 +147,19 @@ class BookingController extends Controller
             'guest' => $booking->guest->name,
         ]);
 
+        $this->setProgress($progressToken, 'uploading');
+
         try {
             $this->firebaseService->generateAndStoreBookingConfirmation($booking);
         } catch (\Throwable $e) {
             Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
         }
 
+        $this->setProgress($progressToken, 'sending');
+
         $whatsapp = $this->whatsAppService->notifyBookingCreated($booking);
+
+        $this->setProgress($progressToken, 'done');
 
         return response()->json(['booking' => $booking, 'whatsapp' => $whatsapp], 201);
     }
