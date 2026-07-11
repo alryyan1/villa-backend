@@ -80,6 +80,7 @@ Route::prefix('v1')->group(function () {
         // App settings (admin only)
         Route::get('settings', [SettingController::class, 'index']);
         Route::put('settings', [SettingController::class, 'update']);
+        Route::post('settings/stamp', [SettingController::class, 'uploadStamp']);
 
         // Maintenance
         Route::get('maintenance/turnover', [MaintenanceController::class, 'turnover']);

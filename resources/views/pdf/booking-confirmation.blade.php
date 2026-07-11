@@ -84,18 +84,16 @@
 
 <!--RTL_START-->
 <div style="font-family:amiri;font-size:5.8pt;line-height:1.15;color:#444444;text-align:right;" dir="rtl">
-  <p style="margin:0 0 3pt;text-align:center;font-size:8.5pt;font-weight:bold;color:#8B6914;">الأحكام والشروط</p>
+  <p style="margin:0 0 3pt;text-align:center;font-size:8.5pt;font-weight:bold;color:#8B6914;">الشروط والأحكام</p>
 
-  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;"><span dir="ltr">Check-in &amp; Check-out</span></p>
-  <p style="margin:0 0 1pt;">وقت الدخول: تبدأ عملية تسجيل الدخول واستلام الفيلا من الساعة <b><span dir="ltr">1:00</span> ظهراً</b> وحتى الساعة <b><span dir="ltr">2:00</span> ظهراً</b>.</p>
-  <p style="margin:0 0 1pt;">وقت المغادرة: يجب الالتزام بتسجيل الخروج النهائي وتسليم المفاتيح في تمام الساعة <b><span dir="ltr">10:00</span> صباحاً</b> كحد أقصى.</p>
-  <p style="margin:0 0 1pt;color:#cf1322;font-weight:bold;">تنويه هام: أي تأخير في إخلاء الفيلا عن الوقت المحدد (<span dir="ltr">10:00</span> صباحاً) يتسبب تلقائياً في تعطيل جدول التعقيم والصيانة للحجوزات التالية، ويترتب عليه خصم مالي مباشر من مبلغ التأمين.</p>
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">وقت الدخول</p>
+  <p style="margin:0 0 1pt;">وقت دخول الفيلا ابتداء من الساعة <b><span dir="ltr">1:00</span></b> إلى <b><span dir="ltr">2:00</span></b> ظهراً.</p>
 
   <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">مبلغ التأمين</p>
   <p style="margin:0 0 1pt;">يتم دفع تأمين مسترد قبل الدخول للفيلا وقدره <b><span dir="ltr">50</span> ريال عماني</b>.</p>
 
   <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">نظافة الفيلا</p>
-  <p style="margin:0 0 1pt;">يجب تسليم الفيلا نظيفة كما تم استلامها، حيث إن عدم الالتزام بالنظافة العامة سيؤدي إلى خصم مبلغ من التأمين.</p>
+  <p style="margin:0 0 1pt;">يجب تسليم الفيلا عند الخروج نظيفة كما تم استلامها، حيث إن عدم الالتزام بالنظافة العامة سيؤدي إلى خصم مبلغ من التأمين.</p>
 
   <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">رمال الشاطئ</p>
   <p style="margin:0 0 1pt;">حرصاً على نظافة الفيلا وراحتكم، يُرجى التكرم بغسل الأرجل وإزالة رمال الشاطئ تماماً قبل الدخول.</p>
@@ -109,13 +107,17 @@
   <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">الملابس المبللة</p>
   <p style="margin:0 0 1pt;">يرجى تجنب الجلوس بملابس السباحة المبللة على أثاث الفيلا الداخلي بعد العودة من الشاطئ.</p>
 
-  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">بند إخلاء المسؤولية القانونية التام (<span dir="ltr">Liability &amp; Safety Disclaimer</span>)</p>
-  <p style="margin:0 0 1pt;"><b>إخلاء مسؤولية الحوادث والإصابات:</b> تخلي إدارة مجمع فلل السيف السكنية مسؤوليتها القانونية والتامة عن أي حوادث، إصابات شخصية، حالات غرق (لا قدر الله)، أو أي عارض صحي قد يحدث للمستأجر أو مرافقيه أو زواره طوال فترة الإقامة داخل الفيلا، أو عند استخدام المرافق التابعة للمجمع، أو الشاطئ المحاذي.</p>
-  <p style="margin:0 0 1pt;"><b>مسؤولية الأطفال والمرافقين:</b> يتحمل المستأجر الرئيسي المسؤولية القانونية والمدنية الكاملة عن سلامته وسلامة جميع الأفراد المرافقين له والزوار، ويلتزم التزاماً تاماً بمراقبة الأطفال مراقبة لصيقة ودائمة طوال فترة تواجدهم في الفيلا أو عند اقترابهم من الشاطئ والمرافق المفتوحة.</p>
-  <p style="margin:0 0 1pt;"><b>المفقودات والثمينات:</b> إدارة المجمع غير مسؤولة إطلاقاً عن فقدان، سرقة، أو تلف أي مقتنيات شخصية، مجوهرات، أموال، أو أجهزة خاصة بالضيوف داخل الفيلا أثناء فترة الإقامة أو بعد المغادرة.</p>
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">إخلاء مسؤولية</p>
+  <p style="margin:0 0 1pt;">تخلي إدارة مجمع فلل السيف السكنية مسؤوليتها القانونية والتامة عن أي حوادث، إصابات شخصية في الفيلا او المجمع السكني.</p>
 
-  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">الإقرار والموافقة القانونية (<span dir="ltr">Booking Confirmation &amp; Acceptance</span>)</p>
-  <p style="margin:0 0 1pt;background-color:#fffbe6;">إن إتمامكم لعملية دفع المبالغ المستحقة (سواء العربون أو كامل المبلغ) وتأكيد الحجز، يُعد بمثابة توقيع إلكتروني، وموافقة نهائية قطعية وتعهداً تاماً منكم بالالتزام بكافة الشروط، الأحكام، والسياسات المذكورة في هذه الوثيقة، وتحملكم المسؤولية القانونية والمالية المترتبة على أي مخالفة لبنودها.</p>
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">وقت المغادرة</p>
+  <p style="margin:0 0 1pt;">يجب الالتزام بتسجيل الخروج في تمام الساعة <b><span dir="ltr">10:00</span> صباحاً</b> كحد أقصى تجنباً لخصم مبلغ التأمين.</p>
+
+  <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">الإقرار والموافقة القانونية</p>
+  <p style="margin:0 0 1pt;background-color:#fffbe6;">إن إتمامكم لعملية دفع المبالغ المستحقة سواء العربون أو كامل المبلغ وتأكيد الحجز، يُعد بمثابة توقيع إلكتروني، وموافقة نهائية منكم بالالتزام بكافة الشروط، والأحكام المذكورة أعلاه.</p>
+
+  <p style="margin:2pt 0 0;">يرجى التواصل على الارقام التالية قبل الوصول بساعة:<br/>
+  <span dir="ltr">76767769</span> &nbsp; <span dir="ltr">76767768</span></p>
 
   <p style="margin:2pt 0 0;text-align:center;font-weight:bold;color:#8B6914;">نتمنى لكم إقامة مريحة ورحلة سعيدة في فلل السيف</p>
 </div>
@@ -126,10 +128,17 @@
     <td width="70%" style="font-family:helvetica;font-size:7pt;line-height:1.4;">
       <b>Al Seef &mdash; Luxury Waterfront Living</b><br/>
       Muscat, Sultanate of Oman<br/>
+      @if($receptionPhone1 || $receptionPhone2)
+        Reception: {{ implode(' / ', array_filter([$receptionPhone1, $receptionPhone2]) ) }}<br/>
+      @endif
       <span style="color:#888888;font-size:6pt;">Generated: {{ $generatedAt }}</span>
     </td>
     <td width="30%" style="font-family:helvetica;font-size:6pt;color:#aaaaaa;text-align:center;border:1px solid #bbbbbb;">
-      Authorized<br/>Stamp &amp; Signature
+      @if($stampImagePath)
+        <img src="{{ $stampImagePath }}" style="max-width:70pt;max-height:35pt;"/>
+      @else
+        Authorized<br/>Stamp &amp; Signature
+      @endif
     </td>
   </tr>
 </table>

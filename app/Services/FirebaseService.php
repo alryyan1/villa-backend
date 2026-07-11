@@ -101,12 +101,18 @@ class FirebaseService
         $methodLabels = ['cash' => 'Cash', 'card' => 'Card (Visa/MC)', 'bank_transfer' => 'Bank Transfer'];
         $omr = fn ($v) => 'OMR ' . number_format((float) $v, 3);
 
+        $stampImage = Setting::get('stamp_image');
+        $stampImagePath = $stampImage ? storage_path('app/public/' . $stampImage) : null;
+
         $html = view('pdf.booking-confirmation', [
-            'booking'      => $booking,
-            'remaining'    => (float) $booking->total_amount - (float) $booking->paid_amount,
-            'omr'          => $omr,
-            'methodLabels' => $methodLabels,
-            'generatedAt'  => now()->format('d M Y, H:i'),
+            'booking'         => $booking,
+            'remaining'       => (float) $booking->total_amount - (float) $booking->paid_amount,
+            'omr'             => $omr,
+            'methodLabels'    => $methodLabels,
+            'generatedAt'     => now()->format('d M Y, H:i'),
+            'receptionPhone1' => Setting::get('reception_phone_1'),
+            'receptionPhone2' => Setting::get('reception_phone_2'),
+            'stampImagePath'  => ($stampImagePath && file_exists($stampImagePath)) ? $stampImagePath : null,
         ])->render();
 
         $pdfBytes = $this->renderPdf($html);

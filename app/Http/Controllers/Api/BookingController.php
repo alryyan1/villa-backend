@@ -102,11 +102,7 @@ class BookingController extends Controller
             return response()->json(['message' => 'This guest has no phone number on file. Add one before creating a booking.'], 422);
         }
 
-        if (!$isOwnerBooking && empty($validated['advance_amount'])) {
-            return response()->json(['message' => 'Advance payment is required.'], 422);
-        }
-
-        if (!$isOwnerBooking && (float) $villa->price_per_night <= 0) {
+        if ((float) $villa->price_per_night <= 0) {
             return response()->json(['message' => 'This villa has no price set. Set its price from the Villas page before creating a booking.'], 422);
         }
 
@@ -134,11 +130,8 @@ class BookingController extends Controller
 
         $validated['user_id']      = $request->user()->id;
         $validated['nights']       = $nights;
-        $validated['total_amount'] = $isOwnerBooking ? 0 : round($effectiveRate * $nights, 3);
+        $validated['total_amount'] = round($effectiveRate * $nights, 3);
         $validated['status']       = $validated['status'] ?? 'confirmed';
-        if ($isOwnerBooking) {
-            $validated['payment_status'] = 'paid';
-        }
 
         $bookingData = collect($validated)->except(['advance_amount', 'advance_method', 'price_per_night', 'progress_token'])->all();
         $booking = Booking::create($bookingData);
@@ -163,12 +156,10 @@ class BookingController extends Controller
 
         $this->setProgress($progressToken, 'uploading');
 
-        if (!$isOwnerBooking) {
-            try {
-                $this->firebaseService->generateAndStoreBookingConfirmation($booking);
-            } catch (\Throwable $e) {
-                Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
-            }
+        try {
+            $this->firebaseService->generateAndStoreBookingConfirmation($booking);
+        } catch (\Throwable $e) {
+            Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
         }
 
         $this->setProgress($progressToken, 'sending');
@@ -225,7 +216,7 @@ class BookingController extends Controller
         if (isset($validated['check_in']) || isset($validated['check_out'])) {
             $villa                     ??= \App\Models\Villa::find($villaId);
             $validated['nights']       = $this->bookingService->calculateNights($checkIn, $checkOut);
-            $validated['total_amount'] = $booking->is_owner ? 0 : $this->bookingService->calculateTotal($villa, $validated['nights']);
+            $validated['total_amount'] = $this->bookingService->calculateTotal($villa, $validated['nights']);
         }
 
         if (isset($validated['status']) && $validated['status'] === 'cancelled') {

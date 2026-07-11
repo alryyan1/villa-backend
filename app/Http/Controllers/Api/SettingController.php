@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class SettingController extends Controller
 {
@@ -31,6 +32,9 @@ class SettingController extends Controller
         'guest_pending_booking_template_has_button',
         'user_booking_template_has_button',
         'owner_self_booking_template_has_button',
+        'reception_phone_1',
+        'reception_phone_2',
+        'stamp_image',
     ];
 
     public function index()
@@ -42,6 +46,10 @@ class SettingController extends Controller
                 $settings[$key] = null;
             }
         }
+
+        $settings['stamp_image_url'] = $settings['stamp_image']
+            ? Storage::disk('public')->url($settings['stamp_image'])
+            : null;
 
         return response()->json($settings);
     }
@@ -71,6 +79,8 @@ class SettingController extends Controller
             'guest_pending_booking_template_has_button' => 'sometimes|boolean',
             'user_booking_template_has_button'      => 'sometimes|boolean',
             'owner_self_booking_template_has_button' => 'sometimes|boolean',
+            'reception_phone_1'           => 'sometimes|nullable|string|max:30',
+            'reception_phone_2'           => 'sometimes|nullable|string|max:30',
         ]);
 
         foreach ($validated as $key => $value) {
@@ -82,5 +92,26 @@ class SettingController extends Controller
         }
 
         return response()->json(['message' => 'Settings saved.']);
+    }
+
+    public function uploadStamp(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|max:2048',
+        ]);
+
+        $oldPath = Setting::get('stamp_image');
+        if ($oldPath) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        $path = $request->file('image')->store('settings', 'public');
+        Setting::set('stamp_image', $path);
+
+        return response()->json([
+            'message' => 'Stamp image uploaded.',
+            'stamp_image' => $path,
+            'stamp_image_url' => Storage::disk('public')->url($path),
+        ]);
     }
 }
