@@ -24,10 +24,13 @@ class SettingController extends Controller
         'guest_checkout_reminder_template_lang',
         'user_booking_template',
         'user_booking_template_lang',
+        'owner_self_booking_template',
+        'owner_self_booking_template_lang',
         'owner_booking_template_has_button',
         'guest_booking_template_has_button',
         'guest_pending_booking_template_has_button',
         'user_booking_template_has_button',
+        'owner_self_booking_template_has_button',
     ];
 
     public function index()
@@ -61,14 +64,17 @@ class SettingController extends Controller
             'guest_checkout_reminder_template_lang' => 'sometimes|nullable|string|max:20',
             'user_booking_template'      => 'sometimes|nullable|string|max:100',
             'user_booking_template_lang' => 'sometimes|nullable|string|max:20',
+            'owner_self_booking_template'      => 'sometimes|nullable|string|max:100',
+            'owner_self_booking_template_lang' => 'sometimes|nullable|string|max:20',
             'owner_booking_template_has_button'     => 'sometimes|boolean',
             'guest_booking_template_has_button'     => 'sometimes|boolean',
             'guest_pending_booking_template_has_button' => 'sometimes|boolean',
             'user_booking_template_has_button'      => 'sometimes|boolean',
+            'owner_self_booking_template_has_button' => 'sometimes|boolean',
         ]);
 
         foreach ($validated as $key => $value) {
-            if (in_array($key, ['whatsapp_enabled', 'owner_notifications_enabled', 'booking_confirmation_notify_enabled', 'firebase_upload_enabled', 'enforce_contract_end_date', 'owner_booking_template_has_button', 'guest_booking_template_has_button', 'guest_pending_booking_template_has_button', 'user_booking_template_has_button'], true)) {
+            if (in_array($key, ['whatsapp_enabled', 'owner_notifications_enabled', 'booking_confirmation_notify_enabled', 'firebase_upload_enabled', 'enforce_contract_end_date', 'owner_booking_template_has_button', 'guest_booking_template_has_button', 'guest_pending_booking_template_has_button', 'user_booking_template_has_button', 'owner_self_booking_template_has_button'], true)) {
                 Setting::set($key, $value ? '1' : '0');
             } else {
                 Setting::set($key, $value ?? '');

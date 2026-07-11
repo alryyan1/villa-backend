@@ -49,12 +49,15 @@ class WhatsAppService
         $results  = ['owner' => null, 'tenant' => null, 'user' => null];
         $noPhone = ['sent' => false, 'error' => 'No phone number'];
 
-        // Owner template
+        // Owner template — a booking the owner made for themselves gets its own
+        // "owner_self_booking_template" instead of the regular guest-driven one.
         if (Setting::get('owner_notifications_enabled', '1') === '1') {
             $ownerPhone = $booking->villa->owner->whatsapp_number ?? $booking->villa->owner->phone;
             if ($ownerPhone) {
                 Log::info("WhatsApp: sending booking notification to owner: {$ownerPhone}");
-                $results['owner'] = $this->sendOwnerBookingTemplate($booking, $ownerPhone);
+                $results['owner'] = $booking->is_owner
+                    ? $this->sendOwnerSelfBookingTemplate($booking, $ownerPhone)
+                    : $this->sendOwnerBookingTemplate($booking, $ownerPhone);
             } else {
                 $results['owner'] = $noPhone;
             }
@@ -66,8 +69,11 @@ class WhatsAppService
             ? fn (Booking $b, string $phone, string $cc) => $this->sendTenantPendingBookingTemplate($b, $phone, $cc)
             : fn (Booking $b, string $phone, string $cc) => $this->sendTenantBookingTemplate($b, $phone, $cc);
 
-        // Tenant template
-        if (Setting::get('tenant_notifications_enabled', '1') !== '0') {
+        // Tenant template — skipped entirely for the owner's own booking (there's
+        // no paying guest to notify).
+        if ($booking->is_owner) {
+            $results['tenant'] = ['sent' => false, 'error' => 'Owner booking — guest not notified'];
+        } elseif (Setting::get('tenant_notifications_enabled', '1') !== '0') {
             if ($booking->guest->phone) {
                 Log::info("WhatsApp: sending booking notification to tenant: {$booking->guest->phone}");
                 $results['tenant'] = $tenantTemplateSender($booking, $booking->guest->phone, $booking->guest->country_code ?: '968');
@@ -211,6 +217,56 @@ class WhatsAppService
 
         if (!$result['success']) {
             Log::error('WhatsApp owner template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
+    }
+
+    /**
+     * Sent instead of sendOwnerBookingTemplate() when the owner books their own
+     * villa (Booking::is_owner) — a distinct Meta template ("owner_booking") with
+     * no commission/net breakdown, since there's nothing to collect.
+     */
+    private function sendOwnerSelfBookingTemplate(Booking $booking, string $phone): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $templateName = Setting::get('owner_self_booking_template', '');
+        $templateLang = Setting::get('owner_self_booking_template_lang', 'ar');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: owner self-booking template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone);
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for owner: {$phone}");
+            return ['sent' => false, 'error' => 'Invalid phone number'];
+        }
+
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => (string) $booking->id],
+                ['type' => 'text', 'text' => $booking->villa->name],
+                ['type' => 'text', 'text' => $booking->check_in->format('Y-m-d')],
+                ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
+                ['type' => 'text', 'text' => number_format((float) $booking->total_amount, 3)],
+            ],
+        ]];
+
+        if (Setting::get('owner_self_booking_template_has_button', '0') === '1') {
+            $components[] = [
+                'type' => 'button', 'sub_type' => 'quick_reply', 'index' => '0',
+                'parameters' => [['type' => 'payload', 'payload' => "download_pdf:{$booking->id}"]],
+            ];
+        }
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+
+        if (!$result['success']) {
+            Log::error('WhatsApp owner self-booking template failed: ' . ($result['error'] ?? 'unknown'));
         }
 
         return ['sent' => $result['success'], 'error' => $result['error'] ?? null];

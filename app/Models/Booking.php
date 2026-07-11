@@ -61,7 +61,7 @@ class Booking extends Model
         'villa_id', 'guest_id', 'user_id', 'num_guests', 'check_in', 'check_in_time', 'check_out',
         'nights', 'status', 'total_amount', 'payment_status',
         'payment_notes', 'notes', 'cancelled_at', 'cancellation_reason',
-        'checked_in_at', 'checked_out_at',
+        'checked_in_at', 'checked_out_at', 'is_owner',
     ];
 
     protected $casts = [
@@ -71,6 +71,7 @@ class Booking extends Model
         'checked_in_at'  => 'datetime',
         'checked_out_at' => 'datetime',
         'total_amount'   => 'decimal:2',
+        'is_owner'       => 'boolean',
     ];
 
     protected $appends = ['paid_amount'];

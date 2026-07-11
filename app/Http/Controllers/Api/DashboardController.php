@@ -33,6 +33,7 @@ class DashboardController extends Controller
             ->count();
 
         $monthlyRevenue = Booking::where('status', 'confirmed')
+            ->where('is_owner', false)
             ->where('check_in', '>=', $thisMonth)
             ->sum('total_amount');
 
@@ -55,9 +56,13 @@ class DashboardController extends Controller
             ->whereNotIn('status', ['cancelled'])
             ->get();
 
+        // Today's checkouts plus any earlier checkout dates that haven't actually
+        // been checked out yet (overdue), so the front desk doesn't lose track of them.
         $checkingOutToday = Booking::with(['villa', 'guest'])
-            ->where('check_out', $today)
+            ->whereDate('check_out', '<=', $today)
+            ->whereNull('checked_out_at')
             ->whereNotIn('status', ['cancelled'])
+            ->orderBy('check_out')
             ->get();
 
         // Revenue last 6 months
@@ -66,6 +71,7 @@ class DashboardController extends Controller
                 DB::raw('SUM(total_amount) as total')
             )
             ->where('status', 'confirmed')
+            ->where('is_owner', false)
             ->where('check_in', '>=', Carbon::now()->subMonths(5)->startOfMonth())
             ->groupBy('month')
             ->orderBy('month')

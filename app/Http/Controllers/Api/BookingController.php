@@ -81,12 +81,15 @@ class BookingController extends Controller
             'notes'            => 'nullable|string',
             'payment_notes'    => 'nullable|string',
             'price_per_night'  => 'nullable|numeric|min:0.001',
-            'advance_amount'   => 'required|numeric|min:0.01',
-            'advance_method'   => 'required|in:cash,card,bank_transfer',
+            'advance_amount'   => 'nullable|numeric|min:0.01',
+            'advance_method'   => 'nullable|in:cash,card,bank_transfer|required_with:advance_amount',
+            'is_owner'         => 'sometimes|boolean',
             'progress_token'   => 'nullable|string|max:64',
         ]);
 
-        $progressToken = $validated['progress_token'] ?? null;
+        $progressToken  = $validated['progress_token'] ?? null;
+        $isOwnerBooking = (bool) ($validated['is_owner'] ?? false);
+        $validated['is_owner'] = $isOwnerBooking;
 
         $villa = \App\Models\Villa::with('owner')->findOrFail($validated['villa_id']);
         $guest = \App\Models\Guest::findOrFail($validated['guest_id']);
@@ -97,6 +100,14 @@ class BookingController extends Controller
 
         if (!$guest->phone) {
             return response()->json(['message' => 'This guest has no phone number on file. Add one before creating a booking.'], 422);
+        }
+
+        if (!$isOwnerBooking && empty($validated['advance_amount'])) {
+            return response()->json(['message' => 'Advance payment is required.'], 422);
+        }
+
+        if (!$isOwnerBooking && (float) $villa->price_per_night <= 0) {
+            return response()->json(['message' => 'This villa has no price set. Set its price from the Villas page before creating a booking.'], 422);
         }
 
         if (!$villa->contract_active) {
@@ -123,8 +134,11 @@ class BookingController extends Controller
 
         $validated['user_id']      = $request->user()->id;
         $validated['nights']       = $nights;
-        $validated['total_amount'] = round($effectiveRate * $nights, 3);
+        $validated['total_amount'] = $isOwnerBooking ? 0 : round($effectiveRate * $nights, 3);
         $validated['status']       = $validated['status'] ?? 'confirmed';
+        if ($isOwnerBooking) {
+            $validated['payment_status'] = 'paid';
+        }
 
         $bookingData = collect($validated)->except(['advance_amount', 'advance_method', 'price_per_night', 'progress_token'])->all();
         $booking = Booking::create($bookingData);
@@ -149,10 +163,12 @@ class BookingController extends Controller
 
         $this->setProgress($progressToken, 'uploading');
 
-        try {
-            $this->firebaseService->generateAndStoreBookingConfirmation($booking);
-        } catch (\Throwable $e) {
-            Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
+        if (!$isOwnerBooking) {
+            try {
+                $this->firebaseService->generateAndStoreBookingConfirmation($booking);
+            } catch (\Throwable $e) {
+                Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
+            }
         }
 
         $this->setProgress($progressToken, 'sending');
@@ -209,7 +225,7 @@ class BookingController extends Controller
         if (isset($validated['check_in']) || isset($validated['check_out'])) {
             $villa                     ??= \App\Models\Villa::find($villaId);
             $validated['nights']       = $this->bookingService->calculateNights($checkIn, $checkOut);
-            $validated['total_amount'] = $this->bookingService->calculateTotal($villa, $validated['nights']);
+            $validated['total_amount'] = $booking->is_owner ? 0 : $this->bookingService->calculateTotal($villa, $validated['nights']);
         }
 
         if (isset($validated['status']) && $validated['status'] === 'cancelled') {
