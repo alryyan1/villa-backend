@@ -191,4 +191,23 @@ class ReportController extends Controller
 
         return response()->json(['from' => $from, 'to' => $to, 'data' => $summary]);
     }
+
+    public function ownerBookings(Request $request)
+    {
+        $from = $request->input('from', Carbon::now()->startOfYear()->format('Y-m-d'));
+        $to   = $request->input('to', Carbon::now()->format('Y-m-d'));
+
+        $bookings = Booking::with(['villa.owner', 'guest', 'user'])
+            ->where('is_owner', true)
+            ->whereBetween('check_in', [$from, $to])
+            ->orderByDesc('check_in')
+            ->get();
+
+        $totals = [
+            'bookings_count' => $bookings->count(),
+            'total_nights'   => (int) $bookings->sum('nights'),
+        ];
+
+        return response()->json(['from' => $from, 'to' => $to, 'data' => $bookings, 'totals' => $totals]);
+    }
 }

@@ -248,8 +248,8 @@ class WhatsAppService
             return ['sent' => false, 'error' => 'Invalid phone number'];
         }
 
-        $receptionPhone1 = Setting::get('reception_phone_1', '76767769');
-        $receptionPhone2 = Setting::get('reception_phone_2', '76767768');
+        $receptionPhone1 = Setting::get('reception_phone_1', '');
+        $receptionPhone2 = Setting::get('reception_phone_2', '');
 
         $components = [[
             'type'       => 'body',
@@ -352,8 +352,8 @@ class WhatsAppService
             return ['sent' => false, 'error' => 'Invalid phone number'];
         }
 
-        $receptionPhone1 = Setting::get('reception_phone_1', '76767769');
-        $receptionPhone2 = Setting::get('reception_phone_2', '76767768');
+        $receptionPhone1 = Setting::get('reception_phone_1', '');
+        $receptionPhone2 = Setting::get('reception_phone_2', '');
 
         $components = [[
             'type'       => 'body',

@@ -64,6 +64,7 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/user-performance', [ReportController::class, 'userPerformance']);
         Route::get('reports/bookings-summary', [ReportController::class, 'bookingsSummary']);
         Route::get('reports/payment-methods', [ReportController::class, 'paymentMethods']);
+        Route::get('reports/owner-bookings', [ReportController::class, 'ownerBookings']);
 
         // Users (admin only)
         Route::apiResource('users', UserController::class);

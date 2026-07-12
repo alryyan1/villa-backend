@@ -84,10 +84,10 @@
 
 <!--RTL_START-->
 <div style="font-family:amiri;font-size:5.8pt;line-height:1.15;color:#444444;text-align:right;" dir="rtl">
-  <p style="margin:0 0 3pt;text-align:center;font-size:8.5pt;font-weight:bold;color:#8B6914;">الشروط والأحكام</p>
+  <p style="margin:0 0 3pt;text-align:center;font-size:8.5pt;font-weight:bold;color:#8B6914;">الأحكام والشروط</p>
 
   <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">وقت الدخول</p>
-  <p style="margin:0 0 1pt;">وقت دخول الفيلا ابتداء من الساعة <b><span dir="ltr">1:00</span></b> إلى <b><span dir="ltr">2:00</span></b> ظهراً.</p>
+  <p style="margin:0 0 1pt;">وقت دخول الفيلا ابتداء من الساعة <span dir="ltr"><b>1:00</b> إلى <b>2:00</b></span> ظهراً.</p>
 
   <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">مبلغ التأمين</p>
   <p style="margin:0 0 1pt;">يتم دفع تأمين مسترد قبل الدخول للفيلا وقدره <b><span dir="ltr">50</span> ريال عماني</b>.</p>
@@ -116,8 +116,10 @@
   <p style="margin:2pt 0 0;font-size:6.5pt;font-weight:bold;color:#4a3000;">الإقرار والموافقة القانونية</p>
   <p style="margin:0 0 1pt;background-color:#fffbe6;">إن إتمامكم لعملية دفع المبالغ المستحقة سواء العربون أو كامل المبلغ وتأكيد الحجز، يُعد بمثابة توقيع إلكتروني، وموافقة نهائية منكم بالالتزام بكافة الشروط، والأحكام المذكورة أعلاه.</p>
 
-  <p style="margin:2pt 0 0;">يرجى التواصل على الارقام التالية قبل الوصول بساعة:<br/>
-  <span dir="ltr">76767769</span> &nbsp; <span dir="ltr">76767768</span></p>
+  @if($receptionPhone1 || $receptionPhone2)
+  <p style="margin:2pt 0 0;">يرجى التواصل على الأرقام التالية قبل الوصول بساعة:<br/>
+  <span dir="ltr">{{ implode(' / ', array_filter([$receptionPhone1, $receptionPhone2])) }}</span></p>
+  @endif
 
   <p style="margin:2pt 0 0;text-align:center;font-weight:bold;color:#8B6914;">نتمنى لكم إقامة مريحة ورحلة سعيدة في فلل السيف</p>
 </div>
@@ -133,12 +135,18 @@
       @endif
       <span style="color:#888888;font-size:6pt;">Generated: {{ $generatedAt }}</span>
     </td>
-    <td width="30%" style="font-family:helvetica;font-size:6pt;color:#aaaaaa;text-align:center;border:1px solid #bbbbbb;">
-      @if($stampImagePath)
-        <img src="{{ $stampImagePath }}" style="max-width:70pt;max-height:35pt;"/>
-      @else
-        Authorized<br/>Stamp &amp; Signature
-      @endif
+    <td width="30%" style="font-family:helvetica;font-size:6pt;color:#aaaaaa;">
+      <table cellpadding="2" cellspacing="0" width="22mm" align="center">
+        <tr>
+          <td style="border:1px solid #bbbbbb;text-align:center;">
+            @if($stampImagePath)
+              <img src="{{ $stampImagePath }}" width="19mm" height="14mm"/>
+            @else
+              Authorized<br/>Stamp &amp; Signature
+            @endif
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 </table>
