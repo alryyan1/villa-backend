@@ -81,7 +81,7 @@ class BookingController extends Controller
             'notes'            => 'nullable|string',
             'payment_notes'    => 'nullable|string',
             'price_per_night'  => 'nullable|numeric|min:0.001',
-            'advance_amount'   => 'nullable|numeric|min:0.01',
+            'advance_amount'   => 'nullable|numeric|min:0',
             'advance_method'   => 'nullable|in:cash,card,bank_transfer|required_with:advance_amount',
             'is_owner'         => 'sometimes|boolean',
             'progress_token'   => 'nullable|string|max:64',
