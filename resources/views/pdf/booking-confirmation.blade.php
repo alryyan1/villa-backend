@@ -25,12 +25,12 @@
     <td width="60%" style="border:1px solid #dddddd;font-family:helvetica;font-size:7.5pt;vertical-align:top;">
       <span style="font-size:8pt;font-weight:bold;color:#4a3000;">Guest &amp; Booking Information</span><br/>
       <span style="color:#555555;">Booking ID:</span> <span style="font-weight:bold;">{{ $booking->id }}</span><br/>
-      <span style="color:#555555;">Client:</span> <span style="font-weight:bold;font-size:9.5pt;">{{ $booking->guest->name ?? '—' }}</span><br/>
+      <span style="color:#555555;">Client:</span> <span style="font-family:amiri;font-weight:bold;font-size:9.5pt;">{{ $booking->guest->name ?? '—' }}</span><br/>
       @if($booking->guest->id_number ?? null)
         <span style="color:#555555;">Civil / Passport ID:</span> <span style="font-weight:bold;">{{ $booking->guest->id_number }}</span><br/>
       @endif
       @if($booking->guest->nationality ?? null)
-        <span style="color:#555555;">Nationality:</span> <span style="font-weight:bold;">{{ $booking->guest->nationality }}</span><br/>
+        <span style="color:#555555;">Nationality:</span> <span style="font-family:amiri;font-weight:bold;">{{ $booking->guest->nationality }}</span><br/>
       @endif
       @if($booking->guest->phone ?? null)
         <span style="color:#555555;">Phone:</span> <span style="font-weight:bold;">{{ $booking->guest->phone }}</span><br/>
@@ -63,7 +63,7 @@
     <td bgcolor="#fafafa" style="border:1px solid #dddddd;font-family:helvetica;font-size:6.5pt;">
       <b>Booking Status:</b> {{ strtoupper($booking->status ?? '') }}
       @if($booking->notes)
-        &nbsp;&nbsp;<b>Notes:</b> {{ $booking->notes }}
+        &nbsp;&nbsp;<b>Notes:</b> <span style="font-family:amiri;">{{ $booking->notes }}</span>
       @endif
     </td>
   </tr>
