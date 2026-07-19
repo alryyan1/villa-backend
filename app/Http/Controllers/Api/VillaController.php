@@ -44,11 +44,13 @@ class VillaController extends Controller
         $isToday   = $asOfStart === $today && $asOfEnd === $today;
         $villaIds  = $paginated->pluck('id');
 
-        // A villa is "occupied" if any booking overlaps the [asOfStart, asOfEnd] range at all
+        // A villa is "occupied" if any booking overlaps the [asOfStart, asOfEnd] range at all.
+        // check_out is the departure day (guest leaves that morning), so it does not count as an occupied night —
+        // use a strict "<" on check_out so the checkout day itself shows as available again.
         $occupiedIds = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
             ->whereDate('check_in', '<=', $asOfEnd)
-            ->whereDate('check_out', '>=', $asOfStart)
+            ->whereDate('check_out', '>', $asOfStart)
             ->pluck('villa_id')
             ->flip()
             ->all();
@@ -78,7 +80,7 @@ class VillaController extends Controller
         $activeBookings = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
             ->whereDate('check_in', '<=', $asOfEnd)
-            ->whereDate('check_out', '>=', $asOfStart)
+            ->whereDate('check_out', '>', $asOfStart)
             ->with('guest:id,name')
             ->get(['id', 'villa_id', 'guest_id', 'check_in', 'check_out', 'checked_in_at', 'checked_out_at', 'payment_status'])
             ->keyBy('villa_id');
