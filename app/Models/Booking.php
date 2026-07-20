@@ -65,8 +65,8 @@ class Booking extends Model
     ];
 
     protected $casts = [
-        'check_in'       => 'date',
-        'check_out'      => 'date',
+        'check_in'       => 'date:Y-m-d',
+        'check_out'      => 'date:Y-m-d',
         'cancelled_at'   => 'datetime',
         'checked_in_at'  => 'datetime',
         'checked_out_at' => 'datetime',

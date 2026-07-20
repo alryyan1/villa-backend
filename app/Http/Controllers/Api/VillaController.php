@@ -38,18 +38,23 @@ class VillaController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 999);
         $paginated = $query->orderBy('name')->paginate($perPage);
 
-        $today     = now()->toDateString();
-        $asOfStart = $request->input('as_of_start', $request->input('as_of', $today));
-        $asOfEnd   = $request->input('as_of_end', $request->input('as_of', $today));
-        $isToday   = $asOfStart === $today && $asOfEnd === $today;
-        $villaIds  = $paginated->pluck('id');
+        $today      = now()->toDateString();
+        $asOfStart  = $request->input('as_of_start', $request->input('as_of', $today));
+        $asOfEnd    = $request->input('as_of_end', $request->input('as_of', $today));
+        $isToday    = $asOfStart === $today && $asOfEnd === $today;
+        $isSingleDay = $asOfStart === $asOfEnd;
+        $villaIds   = $paginated->pluck('id');
 
-        // A villa is "occupied" if any booking overlaps the [asOfStart, asOfEnd] range at all.
-        // check_out is the departure day (guest leaves that morning), so it does not count as an occupied night —
-        // use a strict "<" on check_out so the checkout day itself shows as available again.
+        // A villa is "occupied" if any booking overlaps the viewed window.
+        // Single-day view: asOfStart/asOfEnd is one calendar day — a booking occupies it if it
+        // covers that night, i.e. check_in <= day < check_out (checkout day itself is free again).
+        // Multi-day range view: the range is treated as a candidate stay (check-in = asOfStart,
+        // check-out = asOfEnd), so it uses the same half-open overlap test as new-booking conflict
+        // checks (check_in < asOfEnd AND check_out > asOfStart) — a booking that checks out exactly
+        // on asOfStart or checks in exactly on asOfEnd does not block it (same-day turnover).
         $occupiedIds = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
-            ->whereDate('check_in', '<=', $asOfEnd)
+            ->whereDate('check_in', $isSingleDay ? '<=' : '<', $asOfEnd)
             ->whereDate('check_out', '>', $asOfStart)
             ->pluck('villa_id')
             ->flip()
@@ -77,9 +82,20 @@ class VillaController extends Controller
                 ->all()
             : [];
 
+        // Check-out date is today but departure hasn't been confirmed yet
+        $checkingOutTodayIds = $isToday
+            ? Booking::whereIn('villa_id', $villaIds)
+                ->whereIn('status', ['confirmed', 'pending'])
+                ->whereDate('check_out', $today)
+                ->whereNull('checked_out_at')
+                ->pluck('villa_id')
+                ->flip()
+                ->all()
+            : [];
+
         $activeBookings = Booking::whereIn('villa_id', $villaIds)
             ->whereIn('status', ['confirmed', 'pending'])
-            ->whereDate('check_in', '<=', $asOfEnd)
+            ->whereDate('check_in', $isSingleDay ? '<=' : '<', $asOfEnd)
             ->whereDate('check_out', '>', $asOfStart)
             ->with('guest:id,name')
             ->get(['id', 'villa_id', 'guest_id', 'check_in', 'check_out', 'checked_in_at', 'checked_out_at', 'payment_status'])
@@ -96,7 +112,7 @@ class VillaController extends Controller
             ->groupBy('villa_id')
             ->pluck('cnt', 'villa_id');
 
-        $paginated->getCollection()->transform(function ($villa) use ($occupiedIds, $checkingInTodayIds, $awaitingArrivalIds, $activeBookings, $monthlyBookingCounts) {
+        $paginated->getCollection()->transform(function ($villa) use ($occupiedIds, $checkingInTodayIds, $awaitingArrivalIds, $checkingOutTodayIds, $activeBookings, $monthlyBookingCounts) {
             if ($villa->status !== 'maintenance' && isset($occupiedIds[$villa->id])) {
                 $villa->status = 'occupied';
             } elseif ($villa->status !== 'maintenance' && !isset($occupiedIds[$villa->id])) {
@@ -104,6 +120,7 @@ class VillaController extends Controller
             }
             $villa->checking_in_today   = isset($checkingInTodayIds[$villa->id]);
             $villa->awaiting_arrival    = isset($awaitingArrivalIds[$villa->id]);
+            $villa->checking_out_today  = isset($checkingOutTodayIds[$villa->id]);
             $booking = $activeBookings->get($villa->id);
             $villa->active_booking_id          = $booking?->id;
             $villa->active_booking_guest        = $booking?->guest?->name;
