@@ -114,6 +114,10 @@ class BookingController extends Controller
             return response()->json(['message' => 'This villa is under maintenance and cannot be booked.'], 422);
         }
 
+        if ($villa->status === 'blocked') {
+            return response()->json(['message' => 'This villa is blocked and cannot be booked.'], 422);
+        }
+
         if (
             Setting::get('enforce_contract_end_date', '1') === '1'
             && $villa->contract_end_date
@@ -128,10 +132,11 @@ class BookingController extends Controller
         $nights       = $this->bookingService->calculateNights($validated['check_in'], $validated['check_out']);
         $effectiveRate = $validated['price_per_night'] ?? $villa->price_per_night;
 
-        $validated['user_id']      = $request->user()->id;
-        $validated['nights']       = $nights;
-        $validated['total_amount'] = round($effectiveRate * $nights, 3);
-        $validated['status']       = $validated['status'] ?? 'confirmed';
+        $validated['user_id']         = $request->user()->id;
+        $validated['nights']          = $nights;
+        $validated['original_nights'] = $nights;
+        $validated['total_amount']    = round($effectiveRate * $nights, 3);
+        $validated['status']          = $validated['status'] ?? 'confirmed';
 
         $bookingData = collect($validated)->except(['advance_amount', 'advance_method', 'price_per_night', 'progress_token'])->all();
         $booking = Booking::create($bookingData);
@@ -191,9 +196,11 @@ class BookingController extends Controller
             'cancellation_reason' => 'nullable|string',
         ]);
 
-        $villaId  = $validated['villa_id'] ?? $booking->villa_id;
-        $checkIn  = $validated['check_in']  ?? $booking->check_in->format('Y-m-d');
-        $checkOut = $validated['check_out'] ?? $booking->check_out->format('Y-m-d');
+        $villaId     = $validated['villa_id'] ?? $booking->villa_id;
+        $checkIn     = $validated['check_in']  ?? $booking->check_in->format('Y-m-d');
+        $checkOut    = $validated['check_out'] ?? $booking->check_out->format('Y-m-d');
+        $oldNights   = $booking->nights;
+        $oldCheckOut = $booking->check_out->format('Y-m-d');
 
         if (isset($validated['check_in']) || isset($validated['check_out']) || isset($validated['villa_id'])) {
             if (!$this->bookingService->checkAvailability($villaId, $checkIn, $checkOut, $booking->id)) {
@@ -217,29 +224,46 @@ class BookingController extends Controller
             $villa                     ??= \App\Models\Villa::find($villaId);
             $validated['nights']       = $this->bookingService->calculateNights($checkIn, $checkOut);
             $validated['total_amount'] = $this->bookingService->calculateTotal($villa, $validated['nights']);
+
+            if ($validated['nights'] > $oldNights && ($validated['nights'] - $oldNights) > 2) {
+                return response()->json(['message' => 'A booking can only be extended by up to 2 nights at a time.'], 422);
+            }
         }
 
         if (isset($validated['status']) && $validated['status'] === 'cancelled') {
             $validated['cancelled_at'] = now();
         }
 
+        $isExtend = isset($validated['nights']) && $validated['nights'] > $oldNights;
+
         $booking->update($validated);
         $booking->load(['villa.owner', 'guest', 'user']);
 
         ActivityLogService::log('update_booking', 'Booking', $booking->id);
 
+        $whatsapp = null;
+        $action   = null;
+
         if (isset($validated['status']) && $validated['status'] === 'cancelled') {
-            $this->whatsAppService->notifyBookingCancelled($booking);
+            $whatsapp = $this->whatsAppService->notifyBookingCancelled($booking);
+            $action   = 'cancelled';
         } else {
             try {
                 $this->firebaseService->generateAndStoreBookingConfirmation($booking);
             } catch (\Throwable $e) {
                 Log::error("Firebase confirmation PDF failed for booking {$booking->id}: " . $e->getMessage());
             }
-            $this->whatsAppService->notifyBookingUpdated($booking);
+
+            if ($isExtend) {
+                $whatsapp = $this->whatsAppService->notifyBookingExtended($booking, $oldNights, $oldCheckOut);
+                $action   = 'extended';
+            } else {
+                $whatsapp = $this->whatsAppService->notifyBookingEdited($booking);
+                $action   = 'edited';
+            }
         }
 
-        return response()->json($booking);
+        return response()->json(['booking' => $booking, 'whatsapp' => $whatsapp, 'action' => $action]);
     }
 
     public function confirmBooking(Booking $booking)
@@ -305,10 +329,10 @@ class BookingController extends Controller
     public function destroy(Booking $booking)
     {
         $booking->load(['villa.owner', 'guest', 'user']);
-        $this->whatsAppService->notifyBookingCancelled($booking);
+        $whatsapp = $this->whatsAppService->notifyBookingCancelled($booking);
         ActivityLogService::log('delete_booking', 'Booking', $booking->id);
         $booking->delete();
-        return response()->json(['message' => 'Booking deleted successfully.']);
+        return response()->json(['message' => 'Booking deleted successfully.', 'whatsapp' => $whatsapp]);
     }
 
     public function checkAvailability(Request $request)

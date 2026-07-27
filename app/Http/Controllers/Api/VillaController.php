@@ -113,9 +113,10 @@ class VillaController extends Controller
             ->pluck('cnt', 'villa_id');
 
         $paginated->getCollection()->transform(function ($villa) use ($occupiedIds, $checkingInTodayIds, $awaitingArrivalIds, $checkingOutTodayIds, $activeBookings, $monthlyBookingCounts) {
-            if ($villa->status !== 'maintenance' && isset($occupiedIds[$villa->id])) {
+            $statusLocked = in_array($villa->status, ['maintenance', 'blocked'], true);
+            if (!$statusLocked && isset($occupiedIds[$villa->id])) {
                 $villa->status = 'occupied';
-            } elseif ($villa->status !== 'maintenance' && !isset($occupiedIds[$villa->id])) {
+            } elseif (!$statusLocked && !isset($occupiedIds[$villa->id])) {
                 $villa->status = 'available';
             }
             $villa->checking_in_today   = isset($checkingInTodayIds[$villa->id]);
@@ -143,7 +144,7 @@ class VillaController extends Controller
             'description'            => 'nullable|string',
             'category'               => 'nullable|in:Seashell,Coral,Garden,Breeze,Pearl',
             'num_rooms'              => 'nullable|integer|min:1|max:20',
-            'status'                 => 'in:available,occupied,maintenance',
+            'status'                 => 'in:available,occupied,maintenance,blocked',
             'price_per_night'        => 'required|numeric|min:0',
             'owner_id'               => 'required|exists:owners,id',
             'notes'                  => 'nullable|string',
@@ -170,7 +171,7 @@ class VillaController extends Controller
             'description'            => 'nullable|string',
             'category'               => 'nullable|in:Seashell,Coral,Garden,Breeze,Pearl',
             'num_rooms'              => 'nullable|integer|min:1|max:20',
-            'status'                 => 'in:available,occupied,maintenance',
+            'status'                 => 'in:available,occupied,maintenance,blocked',
             'price_per_night'        => 'sometimes|numeric|min:0',
             'owner_id'               => 'sometimes|exists:owners,id',
             'notes'                  => 'nullable|string',
@@ -218,16 +219,16 @@ class VillaController extends Controller
     public function calendar(Villa $villa, Request $request)
     {
         $month = $request->input('month', now()->format('Y-m'));
-        [$year, $m] = explode('-', $month);
+        $start = \Carbon\Carbon::parse($month . '-01')->startOfMonth();
+        $end   = $start->copy()->endOfMonth();
 
+        // Overlap test (not "check_in/check_out falls inside the month") so a stay
+        // that spans the entire month without either edge landing in it still shows.
         $bookings = $villa->bookings()
             ->with('guest')
             ->whereNotIn('status', ['cancelled'])
-            ->whereYear('check_in', $year)
-            ->whereMonth('check_in', $m)
-            ->orWhere(function ($q) use ($year, $m) {
-                $q->whereYear('check_out', $year)->whereMonth('check_out', $m);
-            })
+            ->where('check_in', '<=', $end->format('Y-m-d'))
+            ->where('check_out', '>=', $start->format('Y-m-d'))
             ->get();
 
         return response()->json($bookings);

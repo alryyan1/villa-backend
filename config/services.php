@@ -49,8 +49,10 @@ return [
     ],
 
     'firebase' => [
-        'credentials_path' => env('FIREBASE_CREDENTIALS_PATH', ''),
-        'storage_bucket'   => env('FIREBASE_STORAGE_BUCKET', ''),
+        'credentials_path'   => env('FIREBASE_CREDENTIALS_PATH', ''),
+        'storage_bucket'     => env('FIREBASE_STORAGE_BUCKET', ''),
+        'project_id'         => env('FIREBASE_PROJECT_ID', ''),
+        'whatsapp_chat_slug' => env('FIREBASE_WHATSAPP_CHAT_SLUG', 'alseef'),
     ],
 
 ];

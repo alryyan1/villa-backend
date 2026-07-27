@@ -90,48 +90,227 @@ class WhatsAppService
         return $results;
     }
 
-    public function notifyBookingUpdated(Booking $booking): void
+    /**
+     * Notifies owner, tenant, and the staff member about a non-extend edit
+     * (villa/dates/guest/etc. changed, but not a nights increase — that's
+     * notifyBookingExtended's job). Same shared edit_booking template for
+     * all three recipients, mirroring notifyBookingCancelled's shape.
+     */
+    public function notifyBookingEdited(Booking $booking): array
     {
         $booking->load(['villa.owner', 'guest', 'user']);
-        $this->sendToOwnerAndManagement($booking, $this->buildOwnerMessage($booking, 'Updated'));
+
+        $results = ['owner' => null, 'tenant' => null, 'user' => null];
+        $noPhone = ['sent' => false, 'error' => 'No phone number'];
+
+        if (Setting::get('owner_notifications_enabled', '1') === '1') {
+            $ownerPhone = $booking->villa->owner->whatsapp_number ?? $booking->villa->owner->phone;
+            if ($ownerPhone) {
+                $results['owner'] = $this->sendEditBookingTemplate($booking, $ownerPhone);
+            } else {
+                $results['owner'] = $noPhone;
+            }
+        } else {
+            $results['owner'] = ['sent' => false, 'error' => 'Owner notifications disabled'];
+        }
+
+        if (Setting::get('tenant_notifications_enabled', '1') !== '0') {
+            if ($booking->guest->phone) {
+                $results['tenant'] = $this->sendEditBookingTemplate($booking, $booking->guest->phone, $booking->guest->country_code ?: '968');
+            } else {
+                $results['tenant'] = $noPhone;
+            }
+        } else {
+            $results['tenant'] = ['sent' => false, 'error' => 'Tenant notifications disabled'];
+        }
+
+        if ($booking->user->phone) {
+            $results['user'] = $this->sendEditBookingTemplate($booking, $booking->user->phone);
+        } else {
+            $results['user'] = $noPhone;
+        }
+
+        return $results;
     }
 
-    public function notifyBookingCancelled(Booking $booking): void
+    private function sendEditBookingTemplate(Booking $booking, string $phone, string $countryCode = '968'): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $templateName = Setting::get('edit_booking_template', 'edit_booking');
+        $templateLang = Setting::get('edit_booking_template_lang', 'ar');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: edit booking template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone, $countryCode);
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for edit notification: {$phone}");
+            return ['sent' => false, 'error' => 'Invalid phone number'];
+        }
+
+        $receptionPhone1 = Setting::get('reception_phone_1', '');
+        $receptionPhone2 = Setting::get('reception_phone_2', '');
+
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => (string) $booking->id],
+                ['type' => 'text', 'text' => $booking->villa->name],
+                ['type' => 'text', 'text' => $booking->check_in->format('Y-m-d')],
+                ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
+                ['type' => 'text', 'text' => number_format((float) $booking->total_amount, 3)],
+                ['type' => 'text', 'text' => $receptionPhone1],
+                ['type' => 'text', 'text' => $receptionPhone2],
+            ],
+        ]];
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null,
+            "✏️ تعديل حجز رقم {$booking->id} — فيلا {$booking->villa->name}");
+
+        if (!$result['success']) {
+            Log::error('WhatsApp edit booking template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
+    }
+
+    /**
+     * Notifies tenant, owner, and the staff member on a booking extension
+     * (check-out pushed later). Mirrors notifyBookingCreated's per-recipient
+     * shape ({owner, tenant, user}) so the frontend can show the same
+     * send-status modal it already uses for new bookings.
+     */
+    public function notifyBookingExtended(Booking $booking, int $oldNights, string $oldCheckOut): array
     {
         $booking->load(['villa.owner', 'guest', 'user']);
-        $this->sendToOwnerAndManagement($booking, $this->buildOwnerMessage($booking, 'Cancelled'));
+        $extraNights = $booking->nights - $oldNights;
 
-        $guestPhone = $booking->guest->phone;
-        if ($guestPhone) {
-            $this->sendMessage($guestPhone,
-                "Dear {$booking->guest->name},\n\n"
-                . "We would like to inform you that your booking for villa *{$booking->villa->name}* "
-                . "on {$booking->check_in->format('Y-m-d')} has been *cancelled*.\n\n"
-                . "Please contact us if you have any questions. Thank you 🏡",
-                $booking->guest->country_code ?: '968'
-            );
+        $results = ['owner' => null, 'tenant' => null, 'user' => null];
+        $noPhone = ['sent' => false, 'error' => 'No phone number'];
+
+        if (Setting::get('owner_notifications_enabled', '1') === '1') {
+            $ownerPhone = $booking->villa->owner->whatsapp_number ?? $booking->villa->owner->phone;
+            if ($ownerPhone) {
+                $results['owner'] = $this->sendOwnerExtendTemplate($booking, $extraNights, $oldCheckOut, $ownerPhone);
+            } else {
+                $results['owner'] = $noPhone;
+            }
+        } else {
+            $results['owner'] = ['sent' => false, 'error' => 'Owner notifications disabled'];
         }
+
+        if (Setting::get('tenant_notifications_enabled', '1') !== '0') {
+            if ($booking->guest->phone) {
+                $results['tenant'] = $this->sendTenantExtendTemplate(
+                    $booking, $extraNights, $oldCheckOut, $booking->guest->phone, $booking->guest->country_code ?: '968'
+                );
+            } else {
+                $results['tenant'] = $noPhone;
+            }
+        } else {
+            $results['tenant'] = ['sent' => false, 'error' => 'Tenant notifications disabled'];
+        }
+
+        if ($booking->user->phone) {
+            $results['user'] = $this->sendUserExtendTemplate($booking, $extraNights, $booking->user->phone);
+        } else {
+            $results['user'] = $noPhone;
+        }
+
+        return $results;
+    }
+
+    /**
+     * Notifies owner, tenant, and the staff member that a booking was
+     * cancelled/deleted, using the shared cancel_booking Meta template for
+     * all three recipients. Mirrors notifyBookingCreated's per-recipient
+     * shape ({owner, tenant, user}) so the frontend can show the same
+     * send-status modal it already uses for new bookings.
+     */
+    public function notifyBookingCancelled(Booking $booking): array
+    {
+        $booking->load(['villa.owner', 'guest', 'user']);
+
+        $results = ['owner' => null, 'tenant' => null, 'user' => null];
+        $noPhone = ['sent' => false, 'error' => 'No phone number'];
+
+        if (Setting::get('owner_notifications_enabled', '1') === '1') {
+            $ownerPhone = $booking->villa->owner->whatsapp_number ?? $booking->villa->owner->phone;
+            if ($ownerPhone) {
+                $results['owner'] = $this->sendCancelBookingTemplate($booking, $booking->villa->owner->name, $ownerPhone);
+            } else {
+                $results['owner'] = $noPhone;
+            }
+        } else {
+            $results['owner'] = ['sent' => false, 'error' => 'Owner notifications disabled'];
+        }
+
+        if (Setting::get('tenant_notifications_enabled', '1') !== '0') {
+            if ($booking->guest->phone) {
+                $results['tenant'] = $this->sendCancelBookingTemplate(
+                    $booking, $booking->guest->name, $booking->guest->phone, $booking->guest->country_code ?: '968'
+                );
+            } else {
+                $results['tenant'] = $noPhone;
+            }
+        } else {
+            $results['tenant'] = ['sent' => false, 'error' => 'Tenant notifications disabled'];
+        }
+
+        if ($booking->user->phone) {
+            $results['user'] = $this->sendCancelBookingTemplate($booking, $booking->user->name, $booking->user->phone);
+        } else {
+            $results['user'] = $noPhone;
+        }
+
+        return $results;
+    }
+
+    /**
+     * Shared cancel_booking template, sent as-is to owner, tenant, and staff —
+     * only the recipient's own name ({{1}}) differs between the three sends.
+     */
+    private function sendCancelBookingTemplate(Booking $booking, string $recipientName, string $phone, string $countryCode = '968'): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $templateName = Setting::get('cancel_booking_template', 'cancel_booking');
+        $templateLang = Setting::get('cancel_booking_template_lang', 'en');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: cancel booking template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone, $countryCode);
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for cancel notification: {$phone}");
+            return ['sent' => false, 'error' => 'Invalid phone number'];
+        }
+
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => $recipientName],
+                ['type' => 'text', 'text' => $booking->villa->name],
+                ['type' => 'text', 'text' => $booking->check_in->format('Y-m-d')],
+            ],
+        ]];
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null,
+            "❌ إلغاء حجز رقم {$booking->id} — فيلا {$booking->villa->name}");
+
+        if (!$result['success']) {
+            Log::error('WhatsApp cancel booking template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
     }
 
     // ── Message builders ────────────────────────────────────────────────────
-
-    private function buildOwnerMessage(Booking $booking, string $action): string
-    {
-        $checkInTime = $booking->check_in_time ? " at {$booking->check_in_time}" : '';
-        $numGuests   = $booking->num_guests ?? 1;
-        $numRooms    = $booking->villa->num_rooms ?? '—';
-
-        return "🏡 *Booking Notification — {$action}*\n\n"
-            . "Villa: {$booking->villa->name} ({$numRooms} rooms)\n"
-            . "Guest: {$booking->guest->name}\n"
-            . "Guests: {$numGuests}\n"
-            . "Check-in: {$booking->check_in->format('Y-m-d')}{$checkInTime}\n"
-            . "Check-out: {$booking->check_out->format('Y-m-d')}\n"
-            . "Nights: {$booking->nights}\n"
-            . "Total: " . number_format((float) $booking->total_amount, 3) . " OMR\n"
-            . "Status: {$this->translateStatus($booking->status)}\n"
-            . "By: {$booking->user->name}";
-    }
 
     private function buildGuestConfirmationMessage(Booking $booking): string
     {
@@ -221,7 +400,10 @@ class WhatsAppService
             ];
         }
 
-        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+        $logBody = $isOwner
+            ? "🏡 حجز عن طريق المالك رقم {$booking->id} — {$booking->villa->name}"
+            : "🏡 إشعار حجز رقم {$booking->id} — {$booking->villa->name} (صافي " . number_format($net, 3) . " ر.ع)";
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null, $logBody);
 
         if (!$result['success']) {
             Log::error('WhatsApp owner template failed: ' . ($result['error'] ?? 'unknown'));
@@ -274,7 +456,8 @@ class WhatsAppService
             ];
         }
 
-        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null,
+            "✅ تأكيد حجز رقم {$booking->id} — فيلا {$booking->villa->name}");
 
         if (!$result['success']) {
             Log::error('WhatsApp tenant template failed: ' . ($result['error'] ?? 'unknown'));
@@ -325,10 +508,159 @@ class WhatsAppService
             ];
         }
 
-        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null,
+            "📋 إشعار حجز رقم {$booking->id} — {$booking->villa->name}");
 
         if (!$result['success']) {
             Log::error('WhatsApp user template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
+    }
+
+    private function sendTenantExtendTemplate(Booking $booking, int $extraNights, string $oldCheckOut, string $phone, string $countryCode = '968'): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $templateName = Setting::get('guest_extend_booking_template', '');
+        $templateLang = Setting::get('guest_extend_booking_template_lang', 'ar');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: guest extend template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone, $countryCode);
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for tenant: {$phone}");
+            return ['sent' => false, 'error' => 'Invalid phone number'];
+        }
+
+        $receptionPhone1 = Setting::get('reception_phone_1', '');
+        $receptionPhone2 = Setting::get('reception_phone_2', '');
+
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => (string) $booking->id],
+                ['type' => 'text', 'text' => $booking->villa->name],
+                ['type' => 'text', 'text' => $oldCheckOut],
+                ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
+                ['type' => 'text', 'text' => (string) $extraNights],
+                ['type' => 'text', 'text' => number_format((float) $booking->total_amount, 3)],
+                ['type' => 'text', 'text' => $receptionPhone1],
+                ['type' => 'text', 'text' => $receptionPhone2],
+            ],
+        ]];
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null,
+            "⏳ تمديد حجز رقم {$booking->id} — فيلا {$booking->villa->name} (+{$extraNights} ليالي)");
+
+        if (!$result['success']) {
+            Log::error('WhatsApp tenant extend template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
+    }
+
+    private function sendUserExtendTemplate(Booking $booking, int $extraNights, string $phone): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $templateName = Setting::get('user_extend_booking_template', '');
+        $templateLang = Setting::get('user_extend_booking_template_lang', 'ar');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: user extend template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone, '968');
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for user: {$phone}");
+            return ['sent' => false, 'error' => 'Invalid phone number'];
+        }
+
+        $remaining = (float) $booking->total_amount - (float) $booking->paid_amount;
+
+        $components = [[
+            'type'       => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => $booking->villa->name],
+                ['type' => 'text', 'text' => (string) $booking->id],
+                ['type' => 'text', 'text' => $booking->guest->phone ?? ''],
+                ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
+                ['type' => 'text', 'text' => (string) $extraNights],
+                ['type' => 'text', 'text' => number_format($remaining, 3)],
+            ],
+        ]];
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null,
+            "🔔 تمديد حجز رقم {$booking->id} — {$booking->villa->name} (+{$extraNights} ليالي)");
+
+        if (!$result['success']) {
+            Log::error('WhatsApp user extend template failed: ' . ($result['error'] ?? 'unknown'));
+        }
+
+        return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
+    }
+
+    /**
+     * Owner extend notification. When the booking is the owner's own
+     * (Booking::is_owner), a distinct Meta template is used with no
+     * commission line — same convention as sendOwnerBookingTemplate.
+     */
+    private function sendOwnerExtendTemplate(Booking $booking, int $extraNights, string $oldCheckOut, string $phone): array
+    {
+        if (!$this->isEnabled()) return ['sent' => false, 'error' => 'WhatsApp disabled'];
+
+        $isOwner = $booking->is_owner;
+
+        $templateName = $isOwner
+            ? Setting::get('owner_self_extend_booking_template', '')
+            : Setting::get('owner_extend_booking_template', '');
+        $templateLang = $isOwner
+            ? Setting::get('owner_self_extend_booking_template_lang', 'ar')
+            : Setting::get('owner_extend_booking_template_lang', 'ar');
+
+        if (empty($templateName)) {
+            Log::info('WhatsApp: owner extend template not configured — skipping.');
+            return ['sent' => false, 'error' => 'Template not configured'];
+        }
+
+        $normalized = WhatsAppCloudApiService::formatPhoneNumber($phone);
+        if (!$normalized) {
+            Log::warning("WhatsApp: invalid phone for owner: {$phone}");
+            return ['sent' => false, 'error' => 'Invalid phone number'];
+        }
+
+        $total      = (float) $booking->total_amount;
+        $commission = $isOwner ? 0.0 : $total * 0.05;
+        $net        = $total - $commission;
+
+        $bodyParams = [
+            ['type' => 'text', 'text' => (string) $booking->id],
+            ['type' => 'text', 'text' => $booking->villa->name],
+            ['type' => 'text', 'text' => $oldCheckOut],
+            ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
+            ['type' => 'text', 'text' => (string) $extraNights],
+            ['type' => 'text', 'text' => number_format($total, 3)],
+        ];
+        if (!$isOwner) {
+            $bodyParams[] = ['type' => 'text', 'text' => number_format($commission, 3)];
+        }
+        $bodyParams[] = ['type' => 'text', 'text' => number_format($net, 3)];
+
+        $components = [['type' => 'body', 'parameters' => $bodyParams]];
+
+        $logBody = $isOwner
+            ? "🏡 تمديد حجز عن طريق المالك رقم {$booking->id} — {$booking->villa->name} (+{$extraNights} ليالي)"
+            : "🏡 تمديد حجز رقم {$booking->id} — {$booking->villa->name} (صافي جديد " . number_format($net, 3) . " ر.ع)";
+
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null, $logBody);
+
+        if (!$result['success']) {
+            Log::error('WhatsApp owner extend template failed: ' . ($result['error'] ?? 'unknown'));
         }
 
         return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
@@ -378,7 +710,8 @@ class WhatsAppService
             ];
         }
 
-        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null,
+            "⏳ حجز معلق رقم {$booking->id} — فيلا {$booking->villa->name}");
 
         if (!$result['success']) {
             Log::error('WhatsApp pending tenant template failed: ' . ($result['error'] ?? 'unknown'));
@@ -414,7 +747,8 @@ class WhatsAppService
             ],
         ]];
 
-        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components);
+        $result = $this->api->sendTemplateMessage($normalized, $templateName, $templateLang, $components, null, null,
+            "⏰ تذكير مغادرة — حجز رقم {$booking->id} — {$booking->villa->name}");
 
         if (!$result['success']) {
             Log::error('WhatsApp checkout reminder failed: ' . ($result['error'] ?? 'unknown'));
@@ -423,24 +757,4 @@ class WhatsAppService
         return ['sent' => $result['success'], 'error' => $result['error'] ?? null];
     }
 
-    private function sendToOwnerAndManagement(Booking $booking, string $message): void
-    {
-        if (Setting::get('owner_notifications_enabled', '1') !== '1') return;
-
-        $ownerPhone = $booking->villa->owner->whatsapp_number ?? $booking->villa->owner->phone;
-        if ($ownerPhone) {
-            $this->sendMessage($ownerPhone, $message);
-        }
-    }
-
-    private function translateStatus(string $status): string
-    {
-        return match ($status) {
-            'pending'   => 'Pending',
-            'confirmed' => 'Confirmed',
-            'cancelled' => 'Cancelled',
-            'completed' => 'Completed',
-            default     => $status,
-        };
-    }
 }

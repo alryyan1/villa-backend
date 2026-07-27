@@ -59,7 +59,7 @@ class Booking extends Model
 
     protected $fillable = [
         'villa_id', 'guest_id', 'user_id', 'num_guests', 'check_in', 'check_in_time', 'check_out',
-        'nights', 'status', 'total_amount', 'payment_status',
+        'nights', 'original_nights', 'status', 'total_amount', 'payment_status',
         'payment_notes', 'notes', 'cancelled_at', 'cancellation_reason',
         'checked_in_at', 'checked_out_at', 'is_owner',
     ];
@@ -74,7 +74,7 @@ class Booking extends Model
         'is_owner'       => 'boolean',
     ];
 
-    protected $appends = ['paid_amount'];
+    protected $appends = ['paid_amount', 'nights_change'];
 
     public function getPaidAmountAttribute(): float
     {
@@ -87,6 +87,19 @@ class Booking extends Model
             return (float) $this->payments->sum('amount');
         }
         return (float) $this->payments()->sum('amount');
+    }
+
+    /**
+     * 'extended'|'shortened'|null — compares the current stay length against
+     * original_nights (set once at creation, untouched by later edits) so the
+     * UI can flag bookings whose dates were changed after the fact.
+     */
+    public function getNightsChangeAttribute(): ?string
+    {
+        if ($this->original_nights === null || $this->nights === $this->original_nights) {
+            return null;
+        }
+        return $this->nights > $this->original_nights ? 'extended' : 'shortened';
     }
 
     public function villa()

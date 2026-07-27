@@ -32,9 +32,22 @@ class SettingController extends Controller
         'guest_pending_booking_template_has_button',
         'user_booking_template_has_button',
         'owner_self_booking_template_has_button',
+        'guest_extend_booking_template',
+        'guest_extend_booking_template_lang',
+        'user_extend_booking_template',
+        'user_extend_booking_template_lang',
+        'owner_extend_booking_template',
+        'owner_extend_booking_template_lang',
+        'owner_self_extend_booking_template',
+        'owner_self_extend_booking_template_lang',
+        'cancel_booking_template',
+        'cancel_booking_template_lang',
+        'edit_booking_template',
+        'edit_booking_template_lang',
         'reception_phone_1',
         'reception_phone_2',
         'stamp_image',
+        'management_logo',
     ];
 
     public function index()
@@ -49,6 +62,10 @@ class SettingController extends Controller
 
         $settings['stamp_image_url'] = $settings['stamp_image']
             ? Storage::disk('public')->url($settings['stamp_image'])
+            : null;
+
+        $settings['management_logo_url'] = $settings['management_logo']
+            ? Storage::disk('public')->url($settings['management_logo'])
             : null;
 
         return response()->json($settings);
@@ -79,6 +96,18 @@ class SettingController extends Controller
             'guest_pending_booking_template_has_button' => 'sometimes|boolean',
             'user_booking_template_has_button'      => 'sometimes|boolean',
             'owner_self_booking_template_has_button' => 'sometimes|boolean',
+            'guest_extend_booking_template'      => 'sometimes|nullable|string|max:100',
+            'guest_extend_booking_template_lang' => 'sometimes|nullable|string|max:20',
+            'user_extend_booking_template'       => 'sometimes|nullable|string|max:100',
+            'user_extend_booking_template_lang'  => 'sometimes|nullable|string|max:20',
+            'owner_extend_booking_template'      => 'sometimes|nullable|string|max:100',
+            'owner_extend_booking_template_lang' => 'sometimes|nullable|string|max:20',
+            'owner_self_extend_booking_template'      => 'sometimes|nullable|string|max:100',
+            'owner_self_extend_booking_template_lang' => 'sometimes|nullable|string|max:20',
+            'cancel_booking_template'      => 'sometimes|nullable|string|max:100',
+            'cancel_booking_template_lang' => 'sometimes|nullable|string|max:20',
+            'edit_booking_template'      => 'sometimes|nullable|string|max:100',
+            'edit_booking_template_lang' => 'sometimes|nullable|string|max:20',
             'reception_phone_1'           => 'sometimes|nullable|string|max:30',
             'reception_phone_2'           => 'sometimes|nullable|string|max:30',
         ]);
@@ -112,6 +141,27 @@ class SettingController extends Controller
             'message' => 'Stamp image uploaded.',
             'stamp_image' => $path,
             'stamp_image_url' => Storage::disk('public')->url($path),
+        ]);
+    }
+
+    public function uploadManagementLogo(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|max:2048',
+        ]);
+
+        $oldPath = Setting::get('management_logo');
+        if ($oldPath) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        $path = $request->file('image')->store('settings', 'public');
+        Setting::set('management_logo', $path);
+
+        return response()->json([
+            'message' => 'Management logo uploaded.',
+            'management_logo' => $path,
+            'management_logo_url' => Storage::disk('public')->url($path),
         ]);
     }
 }

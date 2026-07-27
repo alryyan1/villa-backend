@@ -82,6 +82,7 @@ Route::prefix('v1')->group(function () {
         Route::get('settings', [SettingController::class, 'index']);
         Route::put('settings', [SettingController::class, 'update']);
         Route::post('settings/stamp', [SettingController::class, 'uploadStamp']);
+        Route::post('settings/management-logo', [SettingController::class, 'uploadManagementLogo']);
 
         // Maintenance
         Route::get('maintenance/turnover', [MaintenanceController::class, 'turnover']);

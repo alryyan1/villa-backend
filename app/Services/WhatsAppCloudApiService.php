@@ -13,13 +13,15 @@ class WhatsAppCloudApiService
     protected ?string $accessToken;
     protected ?string $phoneNumberId;
     protected ?string $wabaId;
+    protected FirebaseService $firebase;
 
-    public function __construct()
+    public function __construct(?FirebaseService $firebase = null)
     {
         $this->accessToken   = config('services.whatsapp_cloud.token');
         $this->phoneNumberId = config('services.whatsapp_cloud.phone_number_id');
         $this->wabaId        = config('services.whatsapp_cloud.waba_id');
         $this->apiVersion    = config('services.whatsapp_cloud.api_version', 'v22.0');
+        $this->firebase      = $firebase ?? new FirebaseService();
     }
 
     public function isConfigured(): bool
@@ -55,7 +57,7 @@ class WhatsAppCloudApiService
                     'text' => ['body' => $text],
                 ]);
 
-            return $this->handleResponse($response, 'Text message');
+            return $this->handleResponse($response, 'Text message', $to, $text);
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendTextMessage Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -68,7 +70,8 @@ class WhatsAppCloudApiService
         string $languageCode = 'en_US',
         array $components = [],
         ?string $accessToken = null,
-        ?string $phoneNumberId = null
+        ?string $phoneNumberId = null,
+        ?string $logBody = null
     ): array {
         $accessToken   = $accessToken   ?? $this->accessToken;
         $phoneNumberId = $phoneNumberId ?? $this->phoneNumberId;
@@ -104,7 +107,7 @@ class WhatsAppCloudApiService
                 ->asJson()
                 ->post($endpoint, $payload);
 
-            return $this->handleResponse($response, 'Template message');
+            return $this->handleResponse($response, 'Template message', $to, $logBody ?? "📋 Template sent: {$templateName}");
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendTemplateMessage Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -141,7 +144,7 @@ class WhatsAppCloudApiService
 
         try {
             $response = Http::withToken($accessToken)->asJson()->post($endpoint, $payload);
-            return $this->handleResponse($response, 'Document');
+            return $this->handleResponse($response, 'Document', $to, '📄 ' . ($caption ?? $filename ?? 'Document sent'));
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendDocument Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -217,7 +220,7 @@ class WhatsAppCloudApiService
 
         try {
             $response = Http::withToken($accessToken)->asJson()->post($endpoint, $payload);
-            return $this->handleResponse($response, 'Document (by media id)');
+            return $this->handleResponse($response, 'Document (by media id)', $to, '📄 ' . ($caption ?? $filename ?? 'Document sent'));
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendDocumentById Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -247,7 +250,7 @@ class WhatsAppCloudApiService
 
         try {
             $response = Http::withToken($accessToken)->asJson()->post($endpoint, $payload);
-            return $this->handleResponse($response, 'Image');
+            return $this->handleResponse($response, 'Image', $to, '🖼️ ' . ($caption ?? 'Image sent'));
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendImage Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -305,13 +308,18 @@ class WhatsAppCloudApiService
         }
     }
 
-    protected function handleResponse(Response $response, string $actionDescription): array
+    protected function handleResponse(Response $response, string $actionDescription, ?string $to = null, ?string $logBody = null): array
     {
         $responseData = $response->json();
 
         if ($response->successful() && isset($responseData['messages']) && !empty($responseData['messages'])) {
             $messageId = $responseData['messages'][0]['id'] ?? null;
             Log::info("WhatsAppCloudApiService: {$actionDescription} sent successfully.", ['message_id' => $messageId]);
+
+            if ($messageId && $to) {
+                $this->firebase->logOutgoingWhatsAppMessage($to, $messageId, $logBody ?? $actionDescription);
+            }
+
             return ['success' => true, 'data' => $responseData, 'message_id' => $messageId];
         }
 
