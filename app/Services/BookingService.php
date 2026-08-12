@@ -2,12 +2,100 @@
 
 namespace App\Services;
 
+use App\Exceptions\BookingValidationException;
 use App\Models\Booking;
+use App\Models\Guest;
+use App\Models\Setting;
+use App\Models\User;
 use App\Models\Villa;
 use Carbon\Carbon;
 
 class BookingService
 {
+    /**
+     * Shared booking-creation logic used by both the staff BookingController
+     * and the owner-portal BookingController. Runs all business-rule guards
+     * (villa/guest contact info, contract status, availability, ...),
+     * computes nights/total, creates the Booking (+ optional advance
+     * payment), and returns it loaded with villa.owner/guest/user.
+     *
+     * $validated must already have passed request-level validation; this
+     * method only enforces business rules, not field presence/type.
+     *
+     * @throws BookingValidationException  on any business-rule guard failure (→ 422).
+     */
+    public function createBooking(array $validated, User $user): Booking
+    {
+        $isOwnerBooking = (bool) ($validated['is_owner'] ?? false);
+        $validated['is_owner'] = $isOwnerBooking;
+
+        $villa = Villa::with('owner')->findOrFail($validated['villa_id']);
+        $guest = Guest::findOrFail($validated['guest_id']);
+
+        if (!$villa->owner || !($villa->owner->whatsapp_number ?? $villa->owner->phone)) {
+            throw new BookingValidationException("This villa's owner has no phone number on file. Add one before creating a booking.");
+        }
+
+        if (!$guest->phone) {
+            throw new BookingValidationException('This guest has no phone number on file. Add one before creating a booking.');
+        }
+
+        if ((float) $villa->price_per_night <= 0) {
+            throw new BookingValidationException('This villa has no price set. Set its price from the Villas page before creating a booking.');
+        }
+
+        if (!$villa->contract_active) {
+            throw new BookingValidationException('This villa does not have an active management contract and cannot be booked.');
+        }
+
+        if ($villa->status === 'maintenance') {
+            throw new BookingValidationException('This villa is under maintenance and cannot be booked.');
+        }
+
+        if ($villa->status === 'blocked') {
+            throw new BookingValidationException('This villa is blocked and cannot be booked.');
+        }
+
+        if (
+            Setting::get('enforce_contract_end_date', '1') === '1'
+            && $villa->contract_end_date
+            && $validated['check_out'] > $villa->contract_end_date->format('Y-m-d')
+        ) {
+            throw new BookingValidationException('The checkout date is after this villa\'s management contract ends on ' . $villa->contract_end_date->format('Y-m-d') . '.');
+        }
+
+        if (!$this->checkAvailability($validated['villa_id'], $validated['check_in'], $validated['check_out'])) {
+            throw new BookingValidationException('The villa is already booked for this period.');
+        }
+
+        $nights        = $this->calculateNights($validated['check_in'], $validated['check_out']);
+        $effectiveRate = $validated['price_per_night'] ?? $villa->price_per_night;
+
+        $validated['user_id']         = $user->id;
+        $validated['nights']          = $nights;
+        $validated['original_nights'] = $nights;
+        $validated['total_amount']    = round($effectiveRate * $nights, 3);
+        $validated['status']          = $validated['status'] ?? 'confirmed';
+
+        $bookingData = collect($validated)->except(['advance_amount', 'advance_method', 'price_per_night', 'progress_token'])->all();
+        $booking = Booking::create($bookingData);
+
+        if (!empty($validated['advance_amount'])) {
+            $booking->payments()->create([
+                'amount'       => $validated['advance_amount'],
+                'payment_date' => now()->format('Y-m-d'),
+                'method'       => $validated['advance_method'],
+                'user_id'      => $user->id,
+            ]);
+            $this->updatePaymentStatus($booking);
+            $booking->refresh();
+        }
+
+        $booking->load(['villa.owner', 'guest', 'user']);
+
+        return $booking;
+    }
+
     /**
      * Check whether a villa is available for the given date range.
      *

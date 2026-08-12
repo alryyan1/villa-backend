@@ -77,6 +77,11 @@ class User extends Authenticatable
         return $this->hasMany(ActivityLog::class);
     }
 
+    public function owner()
+    {
+        return $this->hasOne(Owner::class);
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
@@ -85,5 +90,23 @@ class User extends Authenticatable
     public function isManager(): bool
     {
         return in_array($this->role, ['admin', 'manager']);
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->role === 'owner';
+    }
+
+    /**
+     * IDs of the villas owned by this user's linked Owner record.
+     * Empty if this user has no role=owner or no linked Owner.
+     */
+    public function ownedVillaIds(): array
+    {
+        if (!$this->isOwner() || !$this->owner) {
+            return [];
+        }
+
+        return $this->owner->villas()->pluck('id')->all();
     }
 }

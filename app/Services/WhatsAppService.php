@@ -430,9 +430,9 @@ class WhatsAppService
             return ['sent' => false, 'error' => 'Invalid phone number'];
         }
 
-        $receptionPhone1 = Setting::get('reception_phone_1', '');
-        $receptionPhone2 = Setting::get('reception_phone_2', '');
-
+        // v2 template: reception phone is a static "Call" button configured directly
+        // in the Meta template (no runtime parameter needed) — the body no longer
+        // carries the two reception-phone text params.
         $components = [[
             'type'       => 'body',
             'parameters' => [
@@ -441,8 +441,6 @@ class WhatsAppService
                 ['type' => 'text', 'text' => $booking->check_in->format('Y-m-d')],
                 ['type' => 'text', 'text' => $booking->check_out->format('Y-m-d')],
                 ['type' => 'text', 'text' => number_format((float) $booking->total_amount, 3)],
-                ['type' => 'text', 'text' => $receptionPhone1],
-                ['type' => 'text', 'text' => $receptionPhone2],
             ],
         ]];
 

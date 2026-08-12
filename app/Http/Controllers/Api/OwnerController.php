@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Owner;
+use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 
@@ -11,7 +12,11 @@ class OwnerController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Owner::withCount('villas');
+        if ($request->user()->isOwner()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $query = Owner::withCount('villas')->with(['villas:id,name,owner_id']);
 
         if ($request->search) {
             $query->where(function ($q) use ($request) {
@@ -44,8 +49,12 @@ class OwnerController extends Controller
         return response()->json($owner->loadCount('villas'), 201);
     }
 
-    public function show(Owner $owner)
+    public function show(Request $request, Owner $owner)
     {
+        if ($request->user()->isOwner()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         return response()->json($owner->load('villas')->loadCount('villas'));
     }
 
@@ -64,6 +73,45 @@ class OwnerController extends Controller
         ActivityLogService::log('update_owner', 'Owner', $owner->id, ['name' => $owner->name]);
 
         return response()->json($owner->loadCount('villas'));
+    }
+
+    /**
+     * Staff-only action: create a portal login (User with role=owner) for this
+     * Owner and link them. Rejects if the owner already has a login, or if the
+     * given email belongs to an existing user — we never silently convert an
+     * existing (e.g. staff) account to the owner role.
+     */
+    public function enableLogin(Request $request, Owner $owner)
+    {
+        if ($owner->user_id) {
+            return response()->json(['message' => 'This owner already has portal login access.'], 422);
+        }
+
+        $validated = $request->validate([
+            'email'    => 'required|email|max:255',
+            'password' => 'required|string|min:6',
+        ]);
+
+        if (User::where('email', $validated['email'])->exists()) {
+            return response()->json(['message' => 'A user account with this email already exists. Choose a different email.'], 422);
+        }
+
+        $user = User::create([
+            'name'      => $owner->name,
+            'email'     => $validated['email'],
+            'password'  => $validated['password'],
+            'role'      => 'owner',
+            'is_active' => true,
+        ]);
+
+        $owner->update(['user_id' => $user->id]);
+
+        ActivityLogService::log('enable_owner_login', 'Owner', $owner->id, [
+            'name'  => $owner->name,
+            'email' => $user->email,
+        ]);
+
+        return response()->json($owner->fresh()->load('user'));
     }
 
     public function copyPhonesToWhatsApp()

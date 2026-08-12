@@ -17,6 +17,10 @@ use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\CleaningLogController;
 use App\Http\Controllers\Api\WhatsAppBotController;
+use App\Http\Controllers\Api\OwnerPortal\DashboardController as OwnerPortalDashboardController;
+use App\Http\Controllers\Api\OwnerPortal\VillaController as OwnerPortalVillaController;
+use App\Http\Controllers\Api\OwnerPortal\BookingController as OwnerPortalBookingController;
+use App\Http\Controllers\Api\OwnerPortal\GuestController as OwnerPortalGuestController;
 
 // Public auth routes
 Route::prefix('v1')->group(function () {
@@ -40,6 +44,7 @@ Route::prefix('v1')->group(function () {
         Route::get('villas/{villa}/calendar', [VillaController::class, 'calendar']);
 
         Route::post('owners/copy-phones-to-whatsapp', [OwnerController::class, 'copyPhonesToWhatsApp']);
+        Route::post('owners/{owner}/enable-login', [OwnerController::class, 'enableLogin']);
         Route::apiResource('owners', OwnerController::class);
         Route::apiResource('guests', GuestController::class);
 
@@ -94,5 +99,22 @@ Route::prefix('v1')->group(function () {
 
         // Import
         Route::post('import/owners', [ImportController::class, 'importOwners']);
+    });
+
+    // Owner portal — fully separate route group, scoped to the logged-in
+    // owner's own villas/bookings only. See OWNER_PORTAL_PLAN.md.
+    Route::prefix('owner')->middleware(['auth:sanctum', 'ensure.owner'])->group(function () {
+        Route::get('dashboard', [OwnerPortalDashboardController::class, 'index']);
+
+        Route::get('villas', [OwnerPortalVillaController::class, 'index']);
+        Route::get('villas/{villa}', [OwnerPortalVillaController::class, 'show']);
+
+        Route::get('guests', [OwnerPortalGuestController::class, 'index']);
+        Route::post('guests', [OwnerPortalGuestController::class, 'store']);
+
+        Route::get('bookings', [OwnerPortalBookingController::class, 'index']);
+        Route::post('bookings/check-availability', [OwnerPortalBookingController::class, 'checkAvailability']);
+        Route::get('bookings/{booking}', [OwnerPortalBookingController::class, 'show']);
+        Route::post('bookings', [OwnerPortalBookingController::class, 'store']);
     });
 });

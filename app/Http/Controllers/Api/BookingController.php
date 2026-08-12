@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\BookingValidationException;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Setting;
@@ -23,6 +24,10 @@ class BookingController extends Controller
 
     public function index(Request $request)
     {
+        if ($request->user()->isOwner()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         $query = Booking::with(['villa', 'guest', 'user'])->withSum('payments', 'amount');
 
         if ($request->status) {
@@ -87,75 +92,16 @@ class BookingController extends Controller
             'progress_token'   => 'nullable|string|max:64',
         ]);
 
-        $progressToken  = $validated['progress_token'] ?? null;
-        $isOwnerBooking = (bool) ($validated['is_owner'] ?? false);
-        $validated['is_owner'] = $isOwnerBooking;
+        $progressToken = $validated['progress_token'] ?? null;
 
-        $villa = \App\Models\Villa::with('owner')->findOrFail($validated['villa_id']);
-        $guest = \App\Models\Guest::findOrFail($validated['guest_id']);
-
-        if (!$villa->owner || !($villa->owner->whatsapp_number ?? $villa->owner->phone)) {
-            return response()->json(['message' => 'This villa\'s owner has no phone number on file. Add one before creating a booking.'], 422);
+        try {
+            $booking = $this->bookingService->createBooking($validated, $request->user());
+        } catch (BookingValidationException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        if (!$guest->phone) {
-            return response()->json(['message' => 'This guest has no phone number on file. Add one before creating a booking.'], 422);
-        }
-
-        if ((float) $villa->price_per_night <= 0) {
-            return response()->json(['message' => 'This villa has no price set. Set its price from the Villas page before creating a booking.'], 422);
-        }
-
-        if (!$villa->contract_active) {
-            return response()->json(['message' => 'This villa does not have an active management contract and cannot be booked.'], 422);
-        }
-
-        if ($villa->status === 'maintenance') {
-            return response()->json(['message' => 'This villa is under maintenance and cannot be booked.'], 422);
-        }
-
-        if ($villa->status === 'blocked') {
-            return response()->json(['message' => 'This villa is blocked and cannot be booked.'], 422);
-        }
-
-        if (
-            Setting::get('enforce_contract_end_date', '1') === '1'
-            && $villa->contract_end_date
-            && $validated['check_out'] > $villa->contract_end_date->format('Y-m-d')
-        ) {
-            return response()->json(['message' => 'The checkout date is after this villa\'s management contract ends on ' . $villa->contract_end_date->format('Y-m-d') . '.'], 422);
-        }
-
-        if (!$this->bookingService->checkAvailability($validated['villa_id'], $validated['check_in'], $validated['check_out'])) {
-            return response()->json(['message' => 'The villa is already booked for this period.'], 422);
-        }
-        $nights       = $this->bookingService->calculateNights($validated['check_in'], $validated['check_out']);
-        $effectiveRate = $validated['price_per_night'] ?? $villa->price_per_night;
-
-        $validated['user_id']         = $request->user()->id;
-        $validated['nights']          = $nights;
-        $validated['original_nights'] = $nights;
-        $validated['total_amount']    = round($effectiveRate * $nights, 3);
-        $validated['status']          = $validated['status'] ?? 'confirmed';
-
-        $bookingData = collect($validated)->except(['advance_amount', 'advance_method', 'price_per_night', 'progress_token'])->all();
-        $booking = Booking::create($bookingData);
-
-        if (!empty($validated['advance_amount'])) {
-            $booking->payments()->create([
-                'amount'       => $validated['advance_amount'],
-                'payment_date' => now()->format('Y-m-d'),
-                'method'       => $validated['advance_method'],
-                'user_id'      => $request->user()->id,
-            ]);
-            $this->bookingService->updatePaymentStatus($booking);
-            $booking->refresh();
-        }
-
-        $booking->load(['villa.owner', 'guest', 'user']);
 
         ActivityLogService::log('create_booking', 'Booking', $booking->id, [
-            'villa' => $villa->name,
+            'villa' => $booking->villa->name,
             'guest' => $booking->guest->name,
         ]);
 
@@ -176,8 +122,12 @@ class BookingController extends Controller
         return response()->json(['booking' => $booking, 'whatsapp' => $whatsapp], 201);
     }
 
-    public function show(Booking $booking)
+    public function show(Request $request, Booking $booking)
     {
+        if ($request->user()->isOwner()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         return response()->json($booking->load(['villa.owner', 'guest', 'user', 'payments.user']));
     }
 

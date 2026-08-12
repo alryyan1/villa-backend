@@ -36,11 +36,16 @@ class Owner extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'phone', 'whatsapp_number', 'email', 'address', 'notes',
+        'name', 'phone', 'whatsapp_number', 'email', 'address', 'notes', 'user_id',
     ];
 
     public function villas()
     {
         return $this->hasMany(Villa::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

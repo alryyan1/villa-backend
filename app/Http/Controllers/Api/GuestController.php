@@ -11,6 +11,10 @@ class GuestController extends Controller
 {
     public function index(Request $request)
     {
+        if ($request->user()->isOwner()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         $query = Guest::withCount('bookings');
 
         if ($request->search) {
@@ -40,8 +44,12 @@ class GuestController extends Controller
         return response()->json($guest->loadCount('bookings'), 201);
     }
 
-    public function show(Guest $guest)
+    public function show(Request $request, Guest $guest)
     {
+        if ($request->user()->isOwner()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         return response()->json($guest->load('bookings.villa')->loadCount('bookings'));
     }
 

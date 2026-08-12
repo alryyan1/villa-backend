@@ -12,6 +12,10 @@ class VillaController extends Controller
 {
     public function index(Request $request)
     {
+        if ($request->user()->isOwner()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         $query = Villa::with('owner');
 
         if ($request->search) {
@@ -159,8 +163,12 @@ class VillaController extends Controller
         return response()->json($villa->load('owner'), 201);
     }
 
-    public function show(Villa $villa)
+    public function show(Request $request, Villa $villa)
     {
+        if ($request->user()->isOwner()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         return response()->json($villa->load('owner'));
     }
 
