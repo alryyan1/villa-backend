@@ -192,6 +192,66 @@ class ReportController extends Controller
         return response()->json(['from' => $from, 'to' => $to, 'data' => $summary]);
     }
 
+    public function userBookings(Request $request)
+    {
+        $from   = $request->input('from', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $to     = $request->input('to', Carbon::now()->endOfMonth()->format('Y-m-d'));
+        $userId = $request->input('user_id');
+
+        $paidSub = DB::table('payments')
+            ->select('booking_id', DB::raw('SUM(amount) as paid'))
+            ->groupBy('booking_id');
+
+        $bookingsQuery = Booking::with(['villa', 'guest', 'user'])
+            ->leftJoinSub($paidSub, 'p', fn ($join) => $join->on('p.booking_id', '=', 'bookings.id'))
+            ->select('bookings.*', DB::raw('COALESCE(p.paid, 0) as paid_amount'))
+            ->where('bookings.is_owner', false)
+            ->whereBetween('bookings.check_in', [$from, $to]);
+
+        if ($userId) {
+            $bookingsQuery->where('bookings.user_id', $userId);
+        }
+
+        // All rows here are non-owner bookings, so commission is 5% of the
+        // amount actually paid so far (not the full booking total). The
+        // booking's user earns half of that commission as their own cut.
+        $bookings = $bookingsQuery->orderByDesc('bookings.check_in')->get()
+            ->each(function ($b) {
+                $commission = round((float) $b->paid_amount * 0.05, 3);
+                $b->setAttribute('commission_amount', $commission);
+                $b->setAttribute('user_commission_amount', round($commission / 2, 3));
+            });
+
+        $users = User::withCount(['bookings as total_bookings' => fn ($q) => $q->where('is_owner', false)->whereBetween('check_in', [$from, $to])])
+            ->withSum(['bookings as total_amount' => fn ($q) => $q->where('is_owner', false)->whereBetween('check_in', [$from, $to])], 'total_amount')
+            ->get()
+            ->filter(fn ($u) => $u->total_bookings > 0)
+            ->map(function ($user) use ($from, $to) {
+                $paid = DB::table('payments')
+                    ->join('bookings', 'bookings.id', '=', 'payments.booking_id')
+                    ->where('bookings.user_id', $user->id)
+                    ->where('bookings.is_owner', false)
+                    ->whereBetween('bookings.check_in', [$from, $to])
+                    ->sum('payments.amount');
+                $commission = round((float) $paid * 0.05, 3);
+                $user->total_paid            = (float) $paid;
+                $user->total_commission       = $commission;
+                $user->total_user_commission  = round($commission / 2, 3);
+                return $user;
+            })
+            ->values();
+
+        $totals = [
+            'bookings_count'        => $bookings->count(),
+            'total_amount'          => (float) $bookings->sum('total_amount'),
+            'total_paid'            => (float) $bookings->sum('paid_amount'),
+            'total_commission'      => (float) $bookings->sum('commission_amount'),
+            'total_user_commission' => (float) $bookings->sum('user_commission_amount'),
+        ];
+
+        return response()->json(['from' => $from, 'to' => $to, 'users' => $users, 'data' => $bookings, 'totals' => $totals]);
+    }
+
     public function ownerBookings(Request $request)
     {
         $from = $request->input('from', Carbon::now()->startOfYear()->format('Y-m-d'));
